@@ -102,8 +102,8 @@ myocarditis.ind <- ifelse(data$myocarditis == 'Myocarditis', 1, 0)
 
 # covariates
 death <- ifelse(data$outcome == 'Death', 1, 0)
-covariates <- with(data, data.frame(scale(Age), Sex, EOMG, TP.fp, GG2, 
-                                    cort, imm.broader, rs,
+covariates <- with(data, data.frame(scale(Age), Sex, EOMG, thymoma, GG, 
+                                    cort, imm, rs,
                                     death))
 covariates$GG[which(covariates$GG == 'nobiopsy')] <- NA
 
@@ -145,7 +145,7 @@ base_data <- tibble::tibble(mean  = mean,
                             upper = upper,
                             OR = round(mean, 2),
                             pvs = pvs,
-                            variable = c('Age', 'Female', 'LOMG', 'hymoma', 
+                            variable = c('Age', 'Female', 'LOMG', 'Thymoma', 
                                          'Giant cells/granulomas',  'Corticosteroids (after 1993)',
                                          'Immunomodulators (after 1993)',
                                          'Respiratory support (after 1993)',
@@ -153,21 +153,21 @@ base_data <- tibble::tibble(mean  = mean,
 
 base_data |>
   forestplot(labeltext = c(variable, OR, pvs),
-             align = c("l", "c", "c"),     # <-- Align columns
+             align = c("l", "c", "c"),     
              xlim = c(0, 50),
              title = expression(bold("Myocarditis")),
              xlab = expression(bold("Association with myocarditis versus no myocarditis")),
              xlog = TRUE,
              boxsize = .5,
-             lwd.ci = 5,                       # Thicker CI lines
+             lwd.ci = 5,                       
              xticks = c(0.25, 0.5, 1, 2, 5, 50),
              zero = 1,       
              lty.zero = 2, 
-             col = fpColors(zero = "black"),  # Location of vertical line
-             lwd.zero = 5,                     # <--- Thicker vertical line
+             col = fpColors(zero = "black"),  
+             lwd.zero = 5,                     
              txt_gp = fpTxtGp(
                xlab = gpar(fontsize = 12),
-               ticks = gpar(fontsize = 12),    # <--- Larger axis tick labels
+               ticks = gpar(fontsize = 12),    
                label = gpar(fontsize = 12)
              ) # Enlarge axis tick labels
   ) |>

@@ -1,0 +1,45 @@
+\documentclass[tikz,border=0pt]{standalone}
+\usepackage{graphicx}
+
+% ---- Controls ----
+\newcommand{\ColW}{3.2in}   % each figure (and column) width
+\newcommand{\ColGap}{0.20in}% gap between the two columns
+\newcommand{\RowGap}{0.06in}% vertical gap between stacked figures
+% Optional: trim away internal white margins of the PDFs (L B R T, in bp)
+\newcommand{\TRIM}{trim=0bp 6bp 0bp 6bp,clip} % set empty {} if not needed
+
+\begin{document}
+\begin{tikzpicture}[x=1in,y=1in]
+  % Place LEFT column (top-left at (0,0) in inches)
+  \node[anchor=north west, inner sep=0] at (0,0) {%
+    \begin{minipage}[t]{\ColW}
+      \raggedright
+      \includegraphics[width=\linewidth,\TRIM]{forest_plot_strict_myositis.pdf}\par\nointerlineskip
+      \vspace*{\RowGap}
+      \includegraphics[width=\linewidth,\TRIM]{forest_plot_Myocarditis.pdf}\par\nointerlineskip
+      \vspace*{\RowGap}
+      \includegraphics[width=\linewidth,\TRIM]{forest_plot_strict_MG.pdf}\par\nointerlineskip
+      \vspace*{\RowGap}
+      \includegraphics[width=\linewidth,\TRIM]{forest_plot_MM.pdf}\par\nointerlineskip
+      \vspace*{\RowGap}
+      \includegraphics[width=\linewidth,\TRIM]{forest_plot_MGMM.pdf}%
+    \end{minipage}%
+  };
+
+  % Place RIGHT column, same fixed width, same tight stacking
+  \node[anchor=north west, inner sep=0] at ({\ColW+\ColGap},0) {%
+    \begin{minipage}[t]{\ColW}
+      \raggedright
+      \includegraphics[width=\linewidth,\TRIM]{forest_plot_imm.pdf}\par\nointerlineskip
+      \vspace*{\RowGap}
+      \includegraphics[width=\linewidth,\TRIM]{forest_plot_plasma.pdf}\par\nointerlineskip
+      \vspace*{\RowGap}
+      \includegraphics[width=\linewidth,\TRIM]{forest_plot_rs.pdf}\par\nointerlineskip
+      \vspace*{\RowGap}
+      \includegraphics[width=\linewidth,\TRIM]{forest_plot_ct.pdf}\par\nointerlineskip
+      \vspace*{\RowGap}
+      \includegraphics[width=\linewidth,\TRIM]{forest_plot_death.pdf}%
+    \end{minipage}%
+  };
+\end{tikzpicture}
+\end{document}
