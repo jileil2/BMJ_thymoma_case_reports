@@ -972,7 +972,7 @@ for (j in 1:4) {
   Prop <- rbind(Prop, counts[j, ] / nBases[j])
 }
 Prop <- rbind(Prop, 0)
-colnames(counts) <- colnames(Prop)=c("Em+", "Pm+", "Pv+", "Is+")
+colnames(counts) <- colnames(Prop) <- c("Em+", "Pm+", "Pv+", "Is+")
 Table <- cbind(counts, Prop)
 colnames(Table) <- paste(colnames(Table), rep(c("(C)","(P)"), each = ncol(counts)))
 print(Table)
@@ -995,6 +995,12 @@ odds <- cbind(odds, odds - qnorm(.975) * ses, odds + qnorm(.975) * ses)
 odds <- exp(odds)
 colnames(odds) <- c('Odds ratio', 'Lower bound', 'Upper bound')
 
+# sensitivity analysis
+mod <- glm(Em.ind ~ myositis.subtype + Sex + Age.MY, family = 'binomial', 
+           subset = setdiff(subset, c(55, 118, 181)), data = data)
+# p-value
+p <- coef(summary(mod))[2, 4]
+print(p)
 
 # logistic regression (Pm)
 Pm.ind <- ifelse(data$Pm == '+', 1, 0)
@@ -1010,6 +1016,13 @@ ses <- coef(summary(mod))[2, 2]
 odds <- cbind(odds, odds - qnorm(.975) * ses, odds + qnorm(.975) * ses)
 odds <- exp(odds)
 colnames(odds) <- c('Odds ratio', 'Lower bound', 'Upper bound')
+
+# sensitivity analysis
+mod <- glm(Pm.ind ~ myositis.subtype + Sex + Age.MY, family = 'binomial', 
+           subset = setdiff(subset, c(55, 118, 181)), data = data)
+# p-value
+p <- coef(summary(mod))[2, 4]
+print(p)
 
 # logistic regression (Pv)
 Pv.ind <- ifelse(data$Pv == '+', 1, 0)
@@ -1027,6 +1040,14 @@ odds <- exp(odds)
 colnames(odds) <- c('Odds ratio', 'Lower bound', 'Upper bound')
 
 
+# sensitivity analysis
+mod <- glm(Pv.ind ~ myositis.subtype + Sex + Age.MY, family = 'binomial', 
+           subset = setdiff(subset, c(55, 118, 181)), data = data)
+# p-value
+p <- coef(summary(mod))[2, 4]
+print(p)
+
+
 # logistic regression (Is)
 Is.ind <- ifelse(data$Is == '+', 1, 0)
 mod <- glm(Is.ind ~ myositis.subtype + Sex + Age.MY, family = 'binomial', subset = subset, data = data)
@@ -1042,6 +1063,13 @@ odds <- cbind(odds, odds - qnorm(.975) * ses, odds + qnorm(.975) * ses)
 odds <- exp(odds)
 colnames(odds) <- c('Odds ratio', 'Lower bound', 'Upper bound')
 print(odds)
+
+# sensitivity analysis
+mod <- glm(Is.ind ~ myositis.subtype + Sex + Age.MY, family = 'binomial', 
+           subset = setdiff(subset, c(55, 118, 181)), data = data)
+# p-value
+p <- coef(summary(mod))[2, 4]
+print(p)
 
 ### Compare Group 1 (Dermatomyositis) and Group 2 (Polymyositis and GCM/GrM)
 
@@ -1399,6 +1427,13 @@ odds <- exp(odds)
 colnames(odds) <- c('Odds ratio', 'Lower bound', 'Upper bound')
 print(odds)
 
+# sensitivity analysis
+mod <- glm(thymoma.ind ~ myositis.subtype + Sex + Age.MY, 
+           subset = setdiff(subset, c(55, 118, 181)), 
+           data = data, family = 'binomial')
+p <- coef(summary(mod))[2, 4]
+print(p)
+
 # logistic regression
 # Group 1 (polymyositis and GCM/GrM) and Group 2 (OM, XOther, and Dermatomyositis)
 thymoma.ind <- ifelse(data$thymoma == '+', 1, 0)
@@ -1416,6 +1451,11 @@ odds <- exp(odds)
 colnames(odds) <- c('Odds ratio', 'Lower bound', 'Upper bound')
 print(odds)
 
+# sensitivity analysis
+mod <- glm(thymoma.ind ~ group2 + Sex + Age.MY, 
+           subset = (1:206)[-c(55, 118, 181)], data = data, family = 'binomial')
+p <- coef(summary(mod))[2, 4]
+print(p)
 
 #################### myocarditis and thymoma
 tt <- with(data, table(thymoma, myocarditis))
@@ -1595,8 +1635,8 @@ print(Table)
 # logistic regression
 # compare EOMG between between polymyositis and GCM/GrM
 subset <- which(data$myositis.subtype %in% c('GCM/GrM', 'Polymyositis'))
-# ifelse(Cardiac == 'Yes', 1, 0)
-mod <- glm(Cardiac ~ myositis.subtype + Sex + Age.MY, subset = subset, data = data, family = 'binomial')
+Cardiac.ind <- ifelse(data$Cardiac == 'Yes', 1, 0)
+mod <- glm(Cardiac.ind ~ myositis.subtype + Sex + Age.MY, subset = subset, data = data, family = 'binomial')
 
 # p-value
 p <- coef(summary(mod))[2, 4]
@@ -1609,6 +1649,12 @@ odds <- cbind(odds, odds - qnorm(.975) * ses, odds + qnorm(.975) * ses)
 odds <- exp(odds)
 colnames(odds) <- c('Odds ratio', 'Lower bound', 'Upper bound')
 print(odds)
+
+# sensitivity analysis
+mod <- glm(Cardiac.ind ~ myositis.subtype + Sex + Age.MY, subset = setdiff(subset, c(55, 118, 181)), 
+           data = data, family = 'binomial')
+p <- coef(summary(mod))[2, 4]
+print(p)
 
 # logistic regression
 # compare EOMG between between Group 1 (polymyositis and GCM/GrM) and Group 2 (OM, XOther, and Dermatomyositis)
@@ -1670,56 +1716,6 @@ coef(summary(mod, se = 'ker'))[2, 4]
 # median in Group 1 and Group 2
 with(data, tapply(AChR.Level, group2, function(x) median(x, na.rm = TRUE)))
 
-# non-parametric bootstrap
-subtype.MY.f <- data$myositis.subtype
-subtype.MY.f[which(subtype.MY.f == 'GCM/GrM')] <- 'Polymyositis'
-subset <- which(!subtype.MY.f %in% c('XOther', 'OM'))
-mod <- rq(AChR.Level ~ subtype.MY + Age.MY + Sex, subset = subset, data = data)
-t <- coef(summary(mod, se = 'ker'))[3, 3]
-B <- 500
-n <- nrow(data)
-ts <- c()
-for (b in 1:B) {
-  set.seed(b)
-  index.b <- sample((1:n)[subset], length((1:n)[subset]), replace = TRUE)
-  mod1.b <- rq(AChR.Level ~ subtype.MY.f + Age + Sex, subset = index.b, data = data) 
-  ts[b] <- coef(summary(mod1.b, se = 'ker'))[2, 3]
-}
-# p-value for paired comparison between Polymyositis and GCM/GrM
-mean(t > ts)
-
-
-## paired comparison between Polymyositis and Dermatomyositis
-subtype.MY.f <- data$myositis.subtype
-subtype.MY.f[which(subtype.MY.f == 'Dermatomyositis')] <- 'Polymyositis'
-t <- coef(summary(mod, se = 'ker'))[3, 3]
-ts <- c()
-for (b in 1:B) {
-  set.seed(b)
-  index.b <- sample((1:n)[subset], length((1:n)[subset]), replace = TRUE)
-  mod1.b <- rq(AChR.Level ~ subtype.MY.f + Age + Sex, subset = index.b, data = data) 
-  ts[b] <- coef(summary(mod1.b, se = 'ker'))[2, 3]
-}
-
-# p-value for paired comparison
-mean(t > ts)
-
-## paired comparison between GCM/GrM and Dermatomyositis
-subtype.MY.f <- data$myositis.subtype
-subtype.MY.f <- relevel(subtype.MY.f, ref = 'Polymyositis')
-mod <- rq(AChR.Level ~ subtype.MY.f + Age + Sex, subset = subset, data = data)
-subtype.MY.f[which(subtype.MY.f == 'Dermatomyositis')] <- 'GCM/GrM'
-t <- coef(summary(mod, se = 'ker'))[3, 3]
-ts <- c()
-for (b in 1:B) {
-  set.seed(b)
-  index.b <- sample((1:n)[-idx], length((1:n)[-idx]), replace = TRUE)
-  mod1.b <- rq(AChR.Level ~ subtype.MY.f + Age + Sex, subset = index.b) 
-  ts[b] <- coef(summary(mod1.b, se = 'ker'))[2, 3]
-}
-
-# p-value
-mean(t > ts)
 
 #################### striational antibody within myositis subtype
 tt <- with(data, table(myositis.subtype, Striated))
@@ -2400,6 +2396,25 @@ odds <- coef(summary(mod))[2, 1]
 ses <- coef(summary(mod))[2, 2]
 odds <- cbind(odds, odds - qnorm(.975) * ses, odds + qnorm(.975) * ses)
 odds <- exp(odds) 
+colnames(odds) <- c('Odds ratio', 'Lower bound', 'Upper bound')
+print(odds)
+
+#################### Giant cells and myocarditis
+#################### interaction effects between Giant cells and thymoma
+subset <- which(data$GG != 'nobiopsy')
+myocarditis.ind <- ifelse(data$myocarditis == 'Myocarditis', 1, 0)
+mod <- glm(myocarditis.ind ~ thymoma * GG + Sex + Age, family = 'binomial',
+           subset = subset,
+           data = data, control = glm.control(maxit = 50))
+
+# p-value
+coef(summary(mod))[c(2, 3, 6), 4]
+
+# odds ratio
+odds <- coef(summary(mod.j))[c(2, 3, 6), 1]
+ses <- coef(summary(mod.j))[c(2, 3, 6), 2]
+odds <- cbind(odds, odds - qnorm(.975) * ses, odds + qnorm(.975) * ses)
+odds <- exp(odds)
 colnames(odds) <- c('Odds ratio', 'Lower bound', 'Upper bound')
 print(odds)
 
