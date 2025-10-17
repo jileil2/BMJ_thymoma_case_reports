@@ -3271,7 +3271,7 @@ print(odds)
 
 #################### MG alone vs MG with myositis/myocarditis
 #################### Distribution of treatment categories
-tab <- with(data, t(table(treat.cate, mg.type)))
+tab <- with(data, t(table(treatment, mg.type)))
 tab <- cbind(tab, tab / rowSums(tab)) 
 colnames(tab) <- c(paste0(colnames(tab)[1:3], ' (C)'),
                    paste0(colnames(tab)[1:3], ' (P)'))
@@ -3282,8 +3282,8 @@ print(tab)
 
 # likelihood ratio test
 subset <- which(is.na(data$mg.type) == FALSE)
-mod1 <- multinom(treat.cate ~ mg.type + Sex + Age, subset = subset, data = data)
-mod2 <- multinom(treat.cate ~ Sex + Age, subset = subset, data = data)
+mod1 <- multinom(treatment ~ mg.type + Sex + Age, subset = subset, data = data)
+mod2 <- multinom(treatment ~ Sex + Age, subset = subset, data = data)
 anova(mod1, mod2)
 
 
