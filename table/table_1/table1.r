@@ -2411,8 +2411,8 @@ mod <- glm(myocarditis.ind ~ thymoma * GG + Sex + Age, family = 'binomial',
 coef(summary(mod))[c(2, 3, 6), 4]
 
 # odds ratio
-odds <- coef(summary(mod.j))[c(2, 3, 6), 1]
-ses <- coef(summary(mod.j))[c(2, 3, 6), 2]
+odds <- coef(summary(mod))[c(2, 3, 6), 1]
+ses <- coef(summary(mod))[c(2, 3, 6), 2]
 odds <- cbind(odds, odds - qnorm(.975) * ses, odds + qnorm(.975) * ses)
 odds <- exp(odds)
 colnames(odds) <- c('Odds ratio', 'Lower bound', 'Upper bound')
