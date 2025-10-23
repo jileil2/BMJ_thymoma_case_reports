@@ -6,6 +6,7 @@ library("strucchange")
 library('nnet')
 library('quantreg')
 library('multcomp')
+library('DescTools')
 
 #################### read data
 data <- read.csv('data2.csv')[, -1]
@@ -34,10 +35,6 @@ cancer.detailed <- reorder(cancer.detailed, ll)
 contrasts(cancer.detailed) <- contr.sum(6)
 data$cancer.detailed <- cancer.detailed
 
-data <- MM.o
-colnames(data) <- 'derm'
-data$cancer <- CT0
-write.csv(data, 'data2.csv')
 
 #################### Compare Dermatomyositis with Myositis (other)
 #################### Cancer type
@@ -149,8 +146,8 @@ tab[3, (1:5) + 5] <- tab[3, 1:5] / sum(tab[3, 1:5])
 tab
 
 # likelihood ratio test
-mod1 <- multinom(outcome ~ Sex + Age, data = data, subset = which(is.na(MM.o) == FALSE))
-mod2 <- multinom(outcome ~ MM.o + Sex + Age, data = data)
+mod1 <- multinom(outcome ~ Sex + Age, data = data, subset = which(is.na(data$derm) == FALSE))
+mod2 <- multinom(outcome ~ derm + Sex + Age, data = data)
 anova(mod1, mod2)
 
 # logistic regression
@@ -200,7 +197,7 @@ print(odds)
 
 #################### Compare Dermatomyositis with Myositis (other)
 #################### AChR
-tab <- t(table(achr, MM.o))
+tab <- with(data, t(table(AChR, derm)))
 tab <- cbind(tab, tab / rowSums(tab)) 
 colnames(tab) <- c(paste0(colnames(tab)[1:2], ' (C)'),
                    paste0(colnames(tab)[1:2], ' (P)'))
@@ -267,7 +264,7 @@ print(tab)
 
 # logistic regression
 subset <- which(data$derm %in% c('Dermatomyositis', 'Myositis (other)'))
-Op.ind <- ifelse(Op == '+', 1, 0)
+Op.ind <- ifelse(data$Op == '+', 1, 0)
 mod <- glm(Op.ind ~ derm + Sex + Age, family = 'binomial', subset = subset, data = data)
 # p-value
 p <- coef(summary(mod))[2, 4]
@@ -300,7 +297,7 @@ print(tab)
 
 # logistic regression
 subset <- which(data$derm %in% c('Dermatomyositis', 'Myositis (other)'))
-mod <- rq(pck ~ derm + Age + Sex, tau = 0.50, subset = subset)
+mod <- rq(pck ~ derm + Age + Sex, tau = 0.50, subset = subset, data = data)
 # p-value
 p <- coef(summary.rq(mod, se = 'ker'))[2, 4]
 print(p)
@@ -318,6 +315,7 @@ print(coef.ci)
 #################### Interval
 iqr <- function(x) paste0(round(quantile(na.omit(x), .25), 2), '-', 
                           round(quantile(na.omit(x), .75), 2))
+interval <- data$interval
 tab <- c(round(median(interval[which(data$derm == 'Myositis (other)')], na.rm = TRUE), 2),
          round(median(interval[which(data$derm == 'Dermatomyositis')], na.rm = TRUE), 2), 
          round(median(interval, na.rm = TRUE), 2),
@@ -337,7 +335,7 @@ print(tab)
 
 # median regression
 subset <- which(data$derm %in% c('Dermatomyositis', 'Myositis (other)'))
-mod <- rq(interval ~ derm + Age, data = data + Sex, tau = 0.50, data = data, subset = subset)
+mod <- rq(interval ~ derm + Age + Sex, tau = 0.50, data = data, subset = subset)
 # p-value
 p <- coef(summary.rq(mod, se = 'ker'))[2, 4]
 print(p)
@@ -512,9 +510,9 @@ for (i in 1:2) {
     print(paste0('Comparison between ', levels[i], ' and ', levels[j]))
     subset4 <- with(data, which(is.na(myositis.subtypes.other2) == FALSE &
                                   myositis.subtypes.other2 %in% c(levels[i], levels[j])))
-    mod1 <- multinom(cancer.type ~ myositis.subtypes.other2 + Sex + Age, 
+    mod1 <- multinom(cancer.detailed ~ myositis.subtypes.other2 + Sex + Age, 
                      subset = subset4, data = data)
-    mod2 <- multinom(cancer.type ~ Sex + Age, 
+    mod2 <- multinom(cancer.detailed ~ Sex + Age, 
                      subset = subset4, data = data)
     mmmm <- anova(mod1, mod2)
     p <- mmmm$`Pr(Chi)`[2]
@@ -1872,12 +1870,12 @@ print(odds)
 
 #################### Muscle biopsy (myositis alone vs myocarditis alone vs myositis & myocarditis vs all)
 #################### Plasma
-tab <- with(data, table(Plasma, muscle.biopsy))
+tab <- with(data, table(plasma, muscle.biopsy))
 tab <- cbind(tab, tab / rowSums(tab))
 colnames(tab) <- mapply(paste0, colnames(tab), c(' (C)', ' (C)', ' (C)', 
                                                  ' (P)', ' (P)', ' (P)'))
 print(tab)
-tab <- with(data, t(table(Plasma, muscle.biopsy)))
+tab <- with(data, t(table(plasma, muscle.biopsy)))
 tab <- rbind(tab, apply(tab, 2, sum))
 rownames(tab)[4] <- 'All'
 print(tab)
@@ -4081,7 +4079,7 @@ colnames(tab) <- mapply(paste0, colnames(tab), c(' (C)', ' (C)',
 print(tab)
 
 # logistic regression
-mod <- glm(death.ind ~ achr + Sex + Age, data = data, 
+mod <- glm(death.ind ~ AChR + Sex + Age, data = data, 
            family = 'binomial',
            subset = subset, control = glm.control(maxit = 50))
 
@@ -4097,7 +4095,7 @@ colnames(odds) <- c('Odds ratio', 'Lower bound', 'Upper bound')
 
 # logistic regression
 # interaction effects between AChR and myocarditis
-mod <- glm(death.ind ~ achr * myocarditis + Sex + Age, data = data, family = 'binomial', 
+mod <- glm(death.ind ~ AChR * myocarditis + Sex + Age, data = data, family = 'binomial', 
            subset = subset,
            control = glm.control(maxit = 50))
 
@@ -4112,7 +4110,7 @@ print(exp(coef(summary(mod))[6, 1]))
 
 # logistic regression
 # interaction effects between AChR and myositis
-mod <- glm(death.ind ~ achr * my + Sex + Age, data = data, family = 'binomial', 
+mod <- glm(death.ind ~ AChR * my + Sex + Age, data = data, family = 'binomial', 
            subset = subset, control = glm.control(maxit = 50))
 
 # p-value (main effect of AChR)
@@ -4377,3 +4375,559 @@ results <- results[2:5, ]
 colnames(results) <- c("Odds ratio", "2.5 %", "97.5 %", "p-value")
 rownames(results) <- c('AChR', 'Cardiovascular treatment', 'StrAbs', 'Respiratory support')
 round(results, 3)
+
+
+
+
+
+
+
+
+
+#################### Comparison with Table 1 in Fenioux et al (2023)
+cancer.type <- as.character(data$cancer.detailed)
+cancer.type[which(is.na(cancer.type) == TRUE)] <- 'N/A'
+tet <- ifelse(cancer.type == 'thymic', '+', '-')
+tet.my <- tet[which(data$myocarditis == '+')]
+tet.my <- ifelse(tet.my == '+', 'TET', 'Other cancers')
+
+# prepare table
+tab <- table(tet.my)
+tab <- c(tab, tab / sum(tab))
+names(tab) <- mapply(paste0, names(tab), c(' (C)', ' (C)', ' (P)', " (P)"))
+tab <- rbind(tab, c(767, 28, 767 / (767 + 28), 28 / (767 + 28)))
+rownames(tab) <- c('Table 2', 'Fenioux et. al (2023)')
+
+
+#################### Comparison with Table 1 in Fenioux et al (2023)
+#################### Female
+cancer.type <- as.character(data$cancer.detailed)
+cancer.type[which(is.na(cancer.type) == TRUE)] <- 'N/A'
+tet <- ifelse(cancer.type == 'thymic', '+', '-')
+tet.my <- tet[which(data$myocarditis == '+')]
+tet.my <- ifelse(tet.my == '+', 'TET', 'Other cancers')
+
+# prepare table
+tab <- with(data, table(tet.my, Sex[which(myocarditis == '+')]))
+tab <- cbind(tab, tab / rowSums(tab)) 
+tab <- rbind(tab, matrix(c(252, 764 - 252, 252 / 764, (764 - 252) / (764),
+                           14, 13, 14 / 27, 13 / 27), byrow = TRUE,
+                         2, 4))  
+
+require("DescTools")
+tabs <- xtabs(freq ~ .,
+              cbind(expand.grid(Sex = c("F", "M"),
+                                Cancer = c("Other cancers", "TET"),
+                                study = c("Table 2", "Fenioux et. al (2023)")),
+                    freq = as.numeric(t(tab[, 1:2])))
+)
+
+tab.pre <- data.frame(c('Other cancers', 'TET', 'Other cancers', 'TET'),
+                      c('Table 2', 'Table 2',
+                        "Fenioux et. al (2023)", "Fenioux et. al (2023)"), 
+                      tab, t(apply(tab[, 1:2], 1, function(x) x / sum(x))))
+colnames(tab.pre) <- c('Cancer subtypes', 'Study', 'F (C)', 'M (C)', 'F (P)', 'M (P)')
+rownames(tab.pre) <- NULL
+print(tab.pre)
+BreslowDayTest(x = tabs, OR = 1, correct = TRUE)
+
+
+#################### Comparison with Table 1 in Fenioux et al (2023)
+#################### Age
+iqr <- function(x) paste0(round(quantile(na.omit(x), .25), 2), '-', 
+                          round(quantile(na.omit(x), .75), 2))
+Age <- data$Age
+myocarditis <- data$myocarditis
+tet <- ifelse(data$cancer.detailed == 'thymic', '+', '-')
+tab <- c(round(median(Age[which(myocarditis == '+' & tet == '-')], na.rm = TRUE), 2),
+         round(median(Age[which(myocarditis == '+' & tet == '+')], na.rm = TRUE), 2),
+         round(median(Age[which(myocarditis == '+')], na.rm = TRUE), 2),
+         iqr(Age[which(myocarditis == '+' & tet == '-')]),
+         iqr(Age[which(myocarditis == '+' & tet == '+')]),
+         iqr(Age[which(myocarditis == '+')]))
+tab <- matrix(tab, 2, 3, byrow = TRUE)
+rownames(tab) <- c('Median', 'IQR')
+colnames(tab) <- c('Other cancers', 'TET', 'All')
+print(tab)
+
+
+#################### Comparison with Table 1 in Fenioux et al (2023)
+#################### Prior history of MG
+cancer.type <- as.character(data$cancer.detailed)
+cancer.type[which(is.na(cancer.type) == TRUE)] <- 'N/A'
+tet <- ifelse(cancer.type == 'thymic', '+', '-')
+tet.my <- tet[which(data$myocarditis == '+')]
+tet.my <- ifelse(tet.my == '+', 'TET', 'Other cancers')
+
+tab <- with(data, table(tet.my, MG.PD[which(myocarditis == '+')]))
+tab <- cbind(tab, tab / rowSums(tab)) 
+tab <- rbind(tab, matrix(c(723 - 3, 3, (723 - 3) / (723), 3 / 723, 
+                           23, 2, 23 / 25, 2 / 25), byrow = TRUE,
+                         2, 4))  
+
+
+tabs <- xtabs(freq ~ .,
+              cbind(expand.grid(Preexisting.MG = c("-", "+"),
+                                Cancer = c("Other cancers", "TET"),
+                                study = c("Table 2", "Fenioux et. al (2023)")),
+                    freq = as.numeric(t(tab[, 1:2])))
+)
+
+tab.pre <- data.frame(c('Other cancers', 'TET', 'Other cancers', 'TET'),
+                      c('Table 2', 'Table 2',
+                        "Fenioux et. al (2023)", "Fenioux et. al (2023)"), 
+                      tab)
+colnames(tab.pre) <- c('Cancer subtypes', 'Study', '- (C)', '+ (C)', '- (P)', '+ (P)')
+rownames(tab.pre) <- NULL
+tab.pre
+
+BreslowDayTest(x = tabs, OR = 1, correct = TRUE)
+
+
+#################### Comparison with Table 1 in Fenioux et al (2023)
+#################### Anti-PD-1/PD-L1
+cancer.type <- as.character(data$cancer.detailed)
+cancer.type[which(is.na(cancer.type) == TRUE)] <- 'N/A'
+tet <- ifelse(cancer.type == 'thymic', '+', '-')
+tet.my <- tet[which(data$myocarditis == '+')]
+tet.my <- ifelse(tet.my == '+', 'TET', 'Other cancers')
+tab <- with(data, table(tet.my, PD1[which(myocarditis == '+')]))
+tab <- cbind(tab, tab / rowSums(tab)) 
+tab <- rbind(tab, matrix(c(759 - 587, 587, (759 - 587) / (759), 587 / 759, 
+                           1, 26, 1 / 27, 26 / 27), byrow = TRUE,
+                         2, 4))  
+
+tabs <- xtabs(freq ~ .,
+              cbind(expand.grid(PD1 = c("-", "+"),
+                                Cancer = c("Other cancers", "TET"),
+                                study = c("Table 2", "Fenioux et. al (2023)")),
+                    freq = as.numeric(t(tab[, 1:2])))
+)
+
+tab.pre <- data.frame(c('Other cancers', 'TET', 'Other cancers', 'TET'),
+                      c('Table 2', 'Table 2',
+                        "Fenioux et. al (2023)", "Fenioux et. al (2023)"), 
+                      tab)
+colnames(tab.pre) <- c('Cancer subtypes', 'Study', '- (C)', '+ (C)', '- (P)', '+ (P)')
+rownames(tab.pre) <- NULL
+print(tab.pre)
+
+# comparison
+BreslowDayTest(x = tabs, OR = 1, correct = TRUE)
+
+
+#################### Comparison with Table 1 in Fenioux et al (2023)
+#################### Anti-CTLA-4
+cancer.type <- as.character(data$cancer.detailed)
+cancer.type[which(is.na(cancer.type) == TRUE)] <- 'N/A'
+tet <- ifelse(cancer.type == 'thymic', '+', '-')
+tet.my <- tet[which(data$myocarditis == '+')]
+tet.my <- ifelse(tet.my == '+', 'TET', 'Other cancers')
+tab <- with(data, table(tet.my, CTLA4[which(myocarditis == '+')]))
+tab <- cbind(tab, tab / rowSums(tab)) 
+tab <- rbind(tab, matrix(c(759 - 13, 13, (759 - 13) / (759), 13 / 759, 
+                           27, 0, 27 / 27, 0 / 27), byrow = TRUE,
+                         2, 4))  
+
+tabs <- xtabs(freq ~ .,
+              cbind(expand.grid(CTLA4 = c("-", "+"),
+                                Cancer = c("Other cancers", "TET"),
+                                study = c("Table 2", "Fenioux et. al (2023)")),
+                    freq = as.numeric(t(tab[, 1:2])))
+)
+
+
+tab.pre <- data.frame(c('Other cancers', 'TET', 'Other cancers', 'TET'),
+                      c('Table 2', 'Table 2',
+                        "Fenioux et. al (2023)", "Fenioux et. al (2023)"), 
+                      tab)
+colnames(tab.pre) <- c('Cancer subtypes', 'Study', '- (C)', '+ (C)', '- (P)', '+ (P)')
+rownames(tab.pre) <- NULL
+print(tab.pre)
+
+# Breslow-Day Test
+BreslowDayTest(x = tabs, OR = 1, correct = TRUE)
+
+
+
+#################### Comparison with Table 1 in Fenioux et al (2023)
+#################### Anti CTLA-4 and PD1/PDL1 combination therapy
+cancer.type <- as.character(data$cancer.detailed)
+cancer.type[which(is.na(cancer.type) == TRUE)] <- 'N/A'
+tet <- ifelse(cancer.type == 'thymic', '+', '-')
+tet.my <- tet[which(data$myocarditis == '+')]
+tet.my <- ifelse(tet.my == '+', 'TET', 'Other cancers')
+tab <- with(data, table(tet.my, CTLA4_PD1[which(myocarditis == '+')]))
+tab <- cbind(tab, tab / rowSums(tab)) 
+tab <- rbind(tab, matrix(c(759 - 155, 155, (759 - 155) / (759), 155 / 759, 
+                           26, 1, 26 / 27, 1 / 27), byrow = TRUE,
+                         2, 4))  
+
+tabs <- xtabs(freq ~ .,
+              cbind(expand.grid(CTLA4_PD1 = c("-", "+"),
+                                Cancer = c("Other cancers", "TET"),
+                                study = c("Table 2", "Fenioux et. al (2023)")),
+                    freq = as.numeric(t(tab[, 1:2])))
+)
+
+
+tab.pre <- data.frame(c('Other cancers', 'TET', 'Other cancers', 'TET'),
+                      c('Table 2', 'Table 2',
+                        "Fenioux et. al (2023)", "Fenioux et. al (2023)"), 
+                      tab)
+colnames(tab.pre) <- c('Cancer subtypes', 'Study', '- (C)', '+ (C)', '- (P)', '+ (P)')
+rownames(tab.pre) <- NULL
+print(tab.pre)
+
+
+# Breslow-Day Test
+BreslowDayTest(x = tabs, OR = 1, correct = TRUE)
+
+
+#################### Comparison with Table 1 in Fenioux et al (2023)
+#################### MG-like syndrome
+cancer.type <- as.character(data$cancer.detailed)
+cancer.type[which(is.na(cancer.type) == TRUE)] <- 'N/A'
+tet <- ifelse(cancer.type == 'thymic', '+', '-')
+tet.my <- tet[which(data$myocarditis == '+')]
+tet.my <- ifelse(tet.my == '+', 'TET', 'Other cancers')
+tab <- with(data, table(tet.my, MGS[which(myocarditis == '+')]))
+tab <- cbind(tab, tab / rowSums(tab)) 
+tab <- rbind(tab, matrix(c(767 - 157, 157, (767 - 157) / (767), 157 / 767, 
+                           10, 18, 10 / 28, 18 / 28), byrow = TRUE,
+                         2, 4))  
+tabs <- xtabs(freq ~ .,
+              cbind(expand.grid(MG.syndrome = c("-", "+"),
+                                Cancer = c("Other cancers", "TET"),
+                                study = c("Table 2", "Fenioux et. al (2023)")),
+                    freq = as.numeric(t(tab[, 1:2])))
+)
+tab.pre <- data.frame(c('Other cancers', 'TET', 'Other cancers', 'TET'),
+                      c('Table 2', 'Table 2',
+                        "Fenioux et. al (2023)", "Fenioux et. al (2023)"), 
+                      tab)
+colnames(tab.pre) <- c('Cancer subtypes', 'Study', '- (C)', '+ (C)', '- (P)', '+ (P)')
+rownames(tab.pre) <- NULL
+print(tab.pre)
+
+# Breslow-Day Test
+BreslowDayTest(x = tabs, OR = 1, correct = TRUE)
+
+
+
+#################### Comparison with Table 1 in Fenioux et al (2023)
+#################### Myositis/rhabdomyolysis
+cancer.type <- as.character(data$cancer.detailed)
+cancer.type[which(is.na(cancer.type) == TRUE)] <- 'N/A'
+tet <- ifelse(cancer.type == 'thymic', '+', '-')
+tet.my <- tet[which(data$myocarditis == '+')]
+tet.my <- ifelse(tet.my == '+', 'TET', 'Other cancers')
+tab <- with(data, table(tet.my, MR[which(myocarditis == '+')]))
+tab <- cbind(tab, tab / rowSums(tab)) 
+tab <- rbind(tab, matrix(c(767 - 280, 280, (767 - 280) / (767), 280 / 767, 
+                           7, 21, 7 / 28, 21 / 28), byrow = TRUE,
+                         2, 4))  
+tabs <- xtabs(freq ~ .,
+              cbind(expand.grid(Myositis_rhabdomyolysis = c("-", "+"),
+                                Cancer = c("Other cancers", "TET"),
+                                study = c("Table 2", "Fenioux et. al (2023)")),
+                    freq = as.numeric(t(tab[, 1:2])))
+)
+tab.pre <- data.frame(c('Other cancers', 'TET', 'Other cancers', 'TET'),
+                      c('Table 2', 'Table 2',
+                        "Fenioux et. al (2023)", "Fenioux et. al (2023)"), 
+                      tab)
+colnames(tab.pre) <- c('Cancer subtypes', 'Study', '- (C)', '+ (C)', '- (P)', '+ (P)')
+rownames(tab.pre) <- NULL
+print(tab.pre)
+
+# Breslow-Day Test
+BreslowDayTest(x = tabs, OR = 1, correct = TRUE)
+
+
+#################### Comparison with Table 1 in Fenioux et al (2023)
+#################### Definite myocarditis
+cancer.type <- as.character(data$cancer.detailed)
+cancer.type[which(is.na(cancer.type) == TRUE)] <- 'N/A'
+tet <- ifelse(cancer.type == 'thymic', '+', '-')
+tet.my <- tet[which(data$myocarditis == '+')]
+tet.my <- ifelse(tet.my == '+', 'TET', 'Other cancers')
+tab <- with(data, table(tet.my, dm[which(myocarditis == '+')]))
+tab <- cbind(tab, tab / rowSums(tab)) 
+tab <- rbind(tab, matrix(c(696 - 221, 221, (696 - 221) / (696), 221 / 696, 
+                           22 - 9, 9, (22 - 9) / 22, (9) / 22), byrow = TRUE,
+                         2, 4))  
+tabs <- xtabs(freq ~ .,
+              cbind(expand.grid(Definite_myocarditis = c("-", "+"),
+                                Cancer = c("Other cancers", "TET"),
+                                study = c("Table 2", "Fenioux et. al (2023)")),
+                    freq = as.numeric(t(tab[, 1:2])))
+)
+tab.pre <- data.frame(c('Other cancers', 'TET', 'Other cancers', 'TET'),
+                      c('Table 2', 'Table 2',
+                        "Fenioux et. al (2023)", "Fenioux et. al (2023)"), 
+                      tab)
+colnames(tab.pre) <- c('Cancer subtypes', 'Study', '- (C)', '+ (C)', '- (P)', '+ (P)')
+rownames(tab.pre) <- NULL
+print(tab.pre)
+
+# Breslow-Day Test
+BreslowDayTest(x = tabs, OR = 1, correct = TRUE)
+
+
+#################### Comparison with Table 1 in Fenioux et al (2023)
+#################### Probable myocarditis
+cancer.type <- as.character(data$cancer.detailed)
+cancer.type[which(is.na(cancer.type) == TRUE)] <- 'N/A'
+tet <- ifelse(cancer.type == 'thymic', '+', '-')
+tet.my <- tet[which(data$myocarditis == '+')]
+tet.my <- ifelse(tet.my == '+', 'TET', 'Other cancers')
+tab <- with(data, table(tet.my, pm[which(myocarditis == '+')]))
+tab <- cbind(tab, tab / rowSums(tab)) 
+tab <- rbind(tab, matrix(c(696 - 262, 262, (696 - 262) / (696), 262 / 696, 
+                           22 - 4, 4, (22 - 4) / 22, (4) / 22), byrow = TRUE,
+                         2, 4))  
+tabs <- xtabs(freq ~ .,
+              cbind(expand.grid(Probable_myocarditis = c("-", "+"),
+                                Cancer = c("Other cancers", "TET"),
+                                study = c("Table 2", "Fenioux et. al (2023)")),
+                    freq = as.numeric(t(tab[, 1:2])))
+)
+tab.pre <- data.frame(c('Other cancers', 'TET', 'Other cancers', 'TET'),
+                      c('Table 2', 'Table 2',
+                        "Fenioux et. al (2023)", "Fenioux et. al (2023)"), 
+                      tab)
+colnames(tab.pre) <- c('Cancer subtypes', 'Study', '- (C)', '+ (C)', '- (P)', '+ (P)')
+rownames(tab.pre) <- NULL
+print(tab.pre)
+
+# Breslow-Day Test
+BreslowDayTest(x = tabs, OR = 1, correct = TRUE)
+
+
+
+#################### Comparison with Table 1 in Fenioux et al (2023)
+#################### Possible myocarditis
+cancer.type <- as.character(data$cancer.detailed)
+cancer.type[which(is.na(cancer.type) == TRUE)] <- 'N/A'
+tet <- ifelse(cancer.type == 'thymic', '+', '-')
+tet.my <- tet[which(data$myocarditis == '+')]
+tet.my <- ifelse(tet.my == '+', 'TET', 'Other cancers')
+tab <- with(data, table(tet.my, pm2[which(myocarditis == '+')]))
+tab <- cbind(tab, tab / rowSums(tab)) 
+tab <- rbind(tab, matrix(c(696 - 204, 262, (696 - 204) / (696), 204 / 696, 
+                           22 - 7, 7, (22 - 7) / 22, (7) / 22), byrow = TRUE,
+                         2, 4))
+tabs <- xtabs(freq ~ .,
+              cbind(expand.grid(Possible_myocarditis = c("-", "+"),
+                                Cancer = c("Other cancers", "TET"),
+                                study = c("Table 2", "Fenioux et. al (2023)")),
+                    freq = as.numeric(t(tab[, 1:2])))
+)
+tab.pre <- data.frame(c('Other cancers', 'TET', 'Other cancers', 'TET'),
+                      c('Table 2', 'Table 2',
+                        "Fenioux et. al (2023)", "Fenioux et. al (2023)"), 
+                      tab)
+colnames(tab.pre) <- c('Cancer subtypes', 'Study', '- (C)', '+ (C)', '- (P)', '+ (P)')
+rownames(tab.pre) <- NULL
+print(tab.pre)
+
+# Breslow-Day Test
+BreslowDayTest(x = tabs, OR = 1, correct = TRUE)
+
+
+
+#################### Comparison with Table 1 in Fenioux et al (2023)
+#################### Peak troponin
+iqr <- function(x) paste0(round(quantile(na.omit(x), .25), 2), '-', 
+                          round(quantile(na.omit(x), .75), 2))
+pt_norm <- data$pt_norm
+myocarditis <- data$myocarditis
+tet <- ifelse(data$cancer.detailed == 'thymic', '+', '-')
+tab <- c(round(median(pt_norm[which(myocarditis == '+' & tet == '-')], na.rm = TRUE), 2),
+         round(median(pt_norm[which(myocarditis == '+' & tet == '+')], na.rm = TRUE), 2),
+         round(median(pt_norm[which(myocarditis == '+')], na.rm = TRUE), 2),
+         iqr(pt_norm[which(myocarditis == '+' & tet == '-')]),
+         iqr(pt_norm[which(myocarditis == '+' & tet == '+')]),
+         iqr(pt_norm[which(myocarditis == '+')]))
+tab <- matrix(tab, 2, 3, byrow = TRUE)
+rownames(tab) <- c('Median', 'IQR')
+colnames(tab) <- c('Other cancers', 'TET', 'All')
+print(tab)
+
+
+#################### Comparison with Table 1 in Fenioux et al (2023)
+#################### Peak CK
+iqr <- function(x) paste0(round(quantile(na.omit(x), .25), 2), '-', 
+                          round(quantile(na.omit(x), .75), 2))
+pck_norm <- data$pck_norm
+myocarditis <- data$myocarditis
+tet <- ifelse(data$cancer.detailed == 'thymic', '+', '-')
+tab <- c(round(median(pck_norm[which(myocarditis == '+' & tet == '-')], na.rm = TRUE), 2),
+         round(median(pck_norm[which(myocarditis == '+' & tet == '+')], na.rm = TRUE), 2),
+         round(median(pck_norm[which(myocarditis == '+')], na.rm = TRUE), 2),
+         iqr(pck_norm[which(myocarditis == '+' & tet == '-')]),
+         iqr(pck_norm[which(myocarditis == '+' & tet == '+')]),
+         iqr(pck_norm[which(myocarditis == '+')]))
+tab <- matrix(tab, 2, 3, byrow = TRUE)
+rownames(tab) <- c('Median', 'IQR')
+colnames(tab) <- c('Other cancers', 'TET', 'All')
+print(tab)
+
+
+
+#################### Comparison with Table 1 in Fenioux et al (2023)
+#################### Corticosteriods
+cancer.type <- as.character(data$cancer.detailed)
+cancer.type[which(is.na(cancer.type) == TRUE)] <- 'N/A'
+tet <- ifelse(cancer.type == 'thymic', '+', '-')
+tet.my <- tet[which(data$myocarditis == '+')]
+tet.my <- ifelse(tet.my == '+', 'TET', 'Other cancers')
+tab <- with(data, table(tet.my, cort[which(myocarditis == '+')]))
+tab <- cbind(tab, tab / rowSums(tab)) 
+tab <- rbind(tab, matrix(c(767 - 625, 625, (767 - 625) / (767), 625 / 767, 
+                           28 - 27, 27, (28 - 27) / 28, 27 / 28), byrow = TRUE,
+                         2, 4))  
+tabs <- xtabs(freq ~ .,
+              cbind(expand.grid(Corticosteriods = c("-", "+"),
+                                Cancer = c("Other cancers", "TET"),
+                                study = c("Table 2", "Fenioux et. al (2023)")),
+                    freq = as.numeric(t(tab[, 1:2])))
+)
+tab.pre <- data.frame(c('Other cancers', 'TET', 'Other cancers', 'TET'),
+                      c('Table 2', 'Table 2',
+                        "Fenioux et. al (2023)", "Fenioux et. al (2023)"), 
+                      tab)
+colnames(tab.pre) <- c('Cancer subtypes', 'Study', '- (C)', '+ (C)', '- (P)', '+ (P)')
+rownames(tab.pre) <- NULL
+print(tab.pre)
+
+# Breslow-Day Test
+BreslowDayTest(x = tabs, OR = 1, correct = TRUE)
+
+
+
+
+#################### Comparison with Table 1 in Fenioux et al (2023)
+#################### Abatacept
+cancer.type <- as.character(data$cancer.detailed)
+cancer.type[which(is.na(cancer.type) == TRUE)] <- 'N/A'
+tet <- ifelse(cancer.type == 'thymic', '+', '-')
+tet.my <- tet[which(data$myocarditis == '+')]
+tet.my <- ifelse(tet.my == '+', 'TET', 'Other cancers')
+tab <- with(data, table(tet.my, abatacept[which(myocarditis == '+')]))
+tab <- cbind(tab, tab / rowSums(tab)) 
+tab <- rbind(tab, matrix(c(767 - 82, 82, (767 - 82) / (767), 82 / 767, 
+                           28 - 5, 5, (28 - 5) / 28, 5 / 28), byrow = TRUE,
+                         2, 4))  
+tabs <- xtabs(freq ~ .,
+              cbind(expand.grid(Abatacept = c("-", "+"),
+                                Cancer = c("Other cancers", "TET"),
+                                study = c("Table 2", "Fenioux et. al (2023)")),
+                    freq = as.numeric(t(tab[, 1:2])))
+)
+tab.pre <- data.frame(c('Other cancers', 'TET', 'Other cancers', 'TET'),
+                      c('Table 2', 'Table 2',
+                        "Fenioux et. al (2023)", "Fenioux et. al (2023)"), 
+                      tab)
+colnames(tab.pre) <- c('Cancer subtypes', 'Study', '- (C)', '+ (C)', '- (P)', '+ (P)')
+rownames(tab.pre) <- NULL
+print(tab.pre)
+
+# Breslow-Day Test
+BreslowDayTest(x = tabs, OR = 1, correct = TRUE)
+
+
+
+#################### Comparison with Table 1 in Fenioux et al (2023)
+#################### Intravenous immune globulin
+cancer.type <- as.character(data$cancer.detailed)
+cancer.type[which(is.na(cancer.type) == TRUE)] <- 'N/A'
+tet <- ifelse(cancer.type == 'thymic', '+', '-')
+tet.my <- tet[which(data$myocarditis == '+')]
+tet.my <- ifelse(tet.my == '+', 'TET', 'Other cancers')
+tab <- with(data, table(tet.my, imm[which(myocarditis == '+')]))
+tab <- cbind(tab, tab / rowSums(tab)) 
+tab <- rbind(tab, matrix(c(767 - 71, 71, (767 - 71) / (767), 71 / 767, 
+                           28 - 13, 13, (28 - 13) / 28, 13 / 28), byrow = TRUE,
+                         2, 4))  
+tabs <- xtabs(freq ~ .,
+              cbind(expand.grid(Intravenous_immune_globulin = c("-", "+"),
+                                Cancer = c("Other cancers", "TET"),
+                                study = c("Table 2", "Fenioux et. al (2023)")),
+                    freq = as.numeric(t(tab[, 1:2])))
+)
+tab.pre <- data.frame(c('Other cancers', 'TET', 'Other cancers', 'TET'),
+                      c('Table 2', 'Table 2',
+                        "Fenioux et. al (2023)", "Fenioux et. al (2023)"), 
+                      tab)
+colnames(tab.pre) <- c('Cancer subtypes', 'Study', '- (C)', '+ (C)', '- (P)', '+ (P)')
+rownames(tab.pre) <- NULL
+print(tab.pre)
+
+# Breslow-Day Test
+BreslowDayTest(x = tabs, OR = 1, correct = TRUE)
+
+
+
+#################### Comparison with Table 1 in Fenioux et al (2023)
+#################### plasmapheresis
+cancer.type <- as.character(data$cancer.detailed)
+cancer.type[which(is.na(cancer.type) == TRUE)] <- 'N/A'
+tet <- ifelse(cancer.type == 'thymic', '+', '-')
+tet.my <- tet[which(data$myocarditis == '+')]
+tet.my <- ifelse(tet.my == '+', 'TET', 'Other cancers')
+tab <- with(data, table(tet.my, plasmapheresis[which(myocarditis == '+')]))
+tab <- cbind(tab, tab / rowSums(tab)) 
+tab <- rbind(tab, matrix(c(767 - 82, 82, (767 - 82) / (767), 82 / 767, 
+                           28 - 7, 7, (28 - 7) / 28, 7 / 28), byrow = TRUE,
+                         2, 4))  
+tabs <- xtabs(freq ~ .,
+              cbind(expand.grid(plasmapheresis = c("-", "+"),
+                                Cancer = c("Other cancers", "TET"),
+                                study = c("Table 2", "Fenioux et. al (2023)")),
+                    freq = as.numeric(t(tab[, 1:2])))
+)
+tab.pre <- data.frame(c('Other cancers', 'TET', 'Other cancers', 'TET'),
+                      c('Table 2', 'Table 2',
+                        "Fenioux et. al (2023)", "Fenioux et. al (2023)"), 
+                      tab)
+colnames(tab.pre) <- c('Cancer subtypes', 'Study', '- (C)', '+ (C)', '- (P)', '+ (P)')
+rownames(tab.pre) <- NULL
+print(tab.pre)
+
+# Breslow-Day Test
+BreslowDayTest(x = tabs, OR = 1, correct = TRUE)
+
+
+
+#################### Comparison with Table 1 in Fenioux et al (2023)
+#################### death
+cancer.type <- as.character(data$cancer.detailed)
+cancer.type[which(is.na(cancer.type) == TRUE)] <- 'N/A'
+tet <- ifelse(cancer.type == 'thymic', '+', '-')
+tet.my <- tet[which(data$myocarditis == '+')]
+tet.my <- ifelse(tet.my == '+', 'TET', 'Other cancers')
+death <- ifelse(data$outcome == 'Death', '+', '-')
+tab <- with(data, table(tet.my, death[which(myocarditis == '+')]))
+tab <- cbind(tab, tab / rowSums(tab)) 
+tab <- rbind(tab, matrix(c(738 - 122, 122, (738 - 122) / (738), 122 / 738, 
+                           28 - 10, 10, (28 - 10) / 28, 10 / 28), byrow = TRUE,
+                         2, 4)) 
+tabs <- xtabs(freq ~ .,
+              cbind(expand.grid(death = c("-", "+"),
+                                Cancer = c("Other cancers", "TET"),
+                                study = c("Table 2", "Fenioux et. al (2023)")),
+                    freq = as.numeric(t(tab[, 1:2])))
+)
+tab.pre <- data.frame(c('Other cancers', 'TET', 'Other cancers', 'TET'),
+                      c('Table 2', 'Table 2',
+                        "Fenioux et. al (2023)", "Fenioux et. al (2023)"), 
+                      tab)
+colnames(tab.pre) <- c('Cancer subtypes', 'Study', '- (C)', '+ (C)', '- (P)', '+ (P)')
+rownames(tab.pre) <- NULL
+print(tab.pre)
+
+# Breslow-Day Test
+BreslowDayTest(x = tabs, OR = 1, correct = TRUE)
+
