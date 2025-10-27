@@ -4715,9 +4715,9 @@ tet.my <- tet[which(data$myocarditis == '+')]
 tet.my <- ifelse(tet.my == '+', 'TET', 'Other cancers')
 tab <- with(data, table(tet.my, pm2[which(myocarditis == '+')]))
 tab <- cbind(tab, tab / rowSums(tab)) 
-tab <- rbind(tab, matrix(c(696 - 204, 262, (696 - 204) / (696), 204 / 696, 
+tab <- rbind(tab, matrix(c(696 - 204, 204, (696 - 204) / (696), 204 / 696, 
                            22 - 7, 7, (22 - 7) / 22, (7) / 22), byrow = TRUE,
-                         2, 4))
+                         2, 4))  
 tabs <- xtabs(freq ~ .,
               cbind(expand.grid(Possible_myocarditis = c("-", "+"),
                                 Cancer = c("Other cancers", "TET"),
@@ -4846,7 +4846,7 @@ cancer.type[which(is.na(cancer.type) == TRUE)] <- 'N/A'
 tet <- ifelse(cancer.type == 'thymic', '+', '-')
 tet.my <- tet[which(data$myocarditis == '+')]
 tet.my <- ifelse(tet.my == '+', 'TET', 'Other cancers')
-tab <- with(data, table(tet.my, imm[which(myocarditis == '+')]))
+tab <- with(data, table(tet.my, iig[which(myocarditis == '+')]))
 tab <- cbind(tab, tab / rowSums(tab)) 
 tab <- rbind(tab, matrix(c(767 - 71, 71, (767 - 71) / (767), 71 / 767, 
                            28 - 13, 13, (28 - 13) / 28, 13 / 28), byrow = TRUE,
@@ -4909,13 +4909,13 @@ tet <- ifelse(cancer.type == 'thymic', '+', '-')
 tet.my <- tet[which(data$myocarditis == '+')]
 tet.my <- ifelse(tet.my == '+', 'TET', 'Other cancers')
 death <- ifelse(data$outcome == 'Death', '+', '-')
-tab <- with(data, table(tet.my, death[which(myocarditis == '+')]))
+tab <- with(data, table(tet.my, death2[which(myocarditis == '+')]))
 tab <- cbind(tab, tab / rowSums(tab)) 
 tab <- rbind(tab, matrix(c(738 - 122, 122, (738 - 122) / (738), 122 / 738, 
                            28 - 10, 10, (28 - 10) / 28, 10 / 28), byrow = TRUE,
                          2, 4)) 
 tabs <- xtabs(freq ~ .,
-              cbind(expand.grid(death = c("-", "+"),
+              cbind(expand.grid(death2 = c("-", "+"),
                                 Cancer = c("Other cancers", "TET"),
                                 study = c("Table 2", "Fenioux et. al (2023)")),
                     freq = as.numeric(t(tab[, 1:2])))
