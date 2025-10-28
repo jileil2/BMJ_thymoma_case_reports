@@ -95,7 +95,6 @@ Before running any R script, make sure to set your working directory to the loca
 ```r
 # Example for data1
 setwd("/path/to/tables/table_1")
-source("data1.R")
 ```
 
 Alternatively, in RStudio, use:
