@@ -4,8 +4,8 @@ _A Systematic Review and Statistical Analysis (BMJ submission)_
 This repository contains the analysis code and figure/table generation scripts accompanying the manuscript  
 **“Striational Antibody-Associated Myositis – Bridging the Gap between Thymoma and Myasthenia Gravis: A Systematic Review and Statistical Analysis.”**
 
-> **Note:** The dataset is not publicly available. Access can be requested (see **Data Access** below).  
-> All code is included to ensure full reproducibility once the data are available locally.
+> **Note:** The analytic dataset is not publicly available. Access can be requested (see **Data Access** below).  
+> All code is included to ensure reproducibility once the data are available locally.
 
 ---
 
@@ -15,8 +15,8 @@ This repository contains the analysis code and figure/table generation scripts a
 .
 ├── figures/
 │   ├── figure_S1/
-│   │   ├── figure_S1.R        # Reproduces results for Figure S1
-│   │   ├── figure_S1.tex      # Arranges sub-figures into a composite panel
+│   │   ├── figure_S1.R        # Reproduces Figure S1 interactively
+│   │   ├── figure_S1.tex      # Combines sub-figures into one panel
 │   │   └── tex/               # LaTeX files for individual sub-figures
 │   ├── figure_2/
 │   ├── figure_3/
@@ -26,55 +26,55 @@ This repository contains the analysis code and figure/table generation scripts a
 │   └── figure_7/
 │
 ├── tables/
-│   ├── data_dictionary.pdf    # Variable definitions for all datasets
+│   ├── data_dictionary.pdf    # Variable definitions
 │   ├── data1.csv              # Concomitant IIM and MG
 │   ├── data2.csv              # ICI-Induced IIM and/or MG
 │   ├── data3.csv              # Isolated IIM with TET
 │   ├── data4.csv              # Thymoma spontaneous regression
-│   ├── table_1/               # Analysis scripts for data1.csv
-│   ├── table_2/               # Analysis scripts for data2.csv
-│   ├── table_3/               # Analysis scripts for data3.csv
-│   └── table_4/               # Analysis scripts for data4.csv
+│   ├── table_1/–table_4/      # Analyses for Tables 1–4
 │
 ├── README.md
-└── (optional) renv/ or requirements files if present
+└── (optional) renv/ or environment files
 ```
 
 ---
 
 ## How to Reproduce Results
 
-> You’ll need local copies of the data files in the `tables/` directory (see **Data Access** below).  
-> All scripts are intended to be run **line by line in R** to help users inspect intermediate outputs and verify reproducibility.  
-> Readers can find in each script which lines of code correspond to specific results reported in the manuscript.
+All scripts are intended to be run **line by line in R**, not as batch jobs.  
+The R scripts do **not** create intermediate files; instead, they display tables and plots interactively.  
+Inline comments indicate which code blocks correspond to specific manuscript results.
+
+---
 
 ### 1. Figures (Figure S1, Figures 2–7)
 
 Each folder `figures/figure_*` contains:
-- an **R file** (`figure_*.R`) — performs statistical analysis and saves the outputs used for plotting;  
-- a **LaTeX file** (`figure_*.tex`) — assembles multiple sub-figures into a single composite panel;  
-- a **`tex/` subfolder** — contains LaTeX source files for the individual sub-figures.
+- **`figure_*.R`** — R code for statistical analysis and visualization (run line by line).  
+- **`figure_*.tex`** — LaTeX file that arranges multiple sub-figures into one composite figure.  
+- **`tex/` subfolder** — LaTeX sources for each sub-figure (e.g., individual panels).
 
-**Important:**  
-Before compiling `figure_*.tex`, you must **first compile all `.tex` files inside the `tex/` subfolder** to generate the sub-figures.  
-Then, compile `figure_*.tex` to assemble the final composite figure.
+#### Workflow
 
-**Typical workflow:**
+1. **Run the R script line by line** in R to view analyses and plots.  
+2. **Compile all `.tex` files** in the `tex/` subfolder to generate sub-figure PDFs.  
+3. **Move or copy** the resulting PDFs into the same directory as `figure_*.tex`.  
+4. **Compile** the main `figure_*.tex` to assemble the final composite figure.
+
 ```bash
-# Step 1: Run the R script line by line to generate intermediate data/plots
+# Example: Figure 2
 Rscript figures/figure_2/figure_2.R
 
-# Step 2: Compile the sub-figures first
-cd figures/figure_2/tex
-pdflatex -interaction=nonstopmode subfigure_1.tex
-pdflatex -interaction=nonstopmode subfigure_2.tex
-# ...
+# Compile sub-figures
+pdflatex figures/figure_2/tex/*.tex
 
-# Step 3: Compile the main figure panel
-cd ..
-pdflatex -interaction=nonstopmode figure_2.tex
-# or:
-latexmk -pdf figure_2.tex
+# Move sub-figure PDFs next to figure_2.tex
+mv figures/figure_2/tex/*.pdf figures/figure_2/
+
+# Compile composite panel
+pdflatex figures/figure_2/figure_2.tex
+# or
+latexmk -pdf figures/figure_2/figure_2.tex
 ```
 
 Repeat for `figure_S1`, `figure_3`, …, `figure_7`.
@@ -83,21 +83,23 @@ Repeat for `figure_S1`, `figure_3`, …, `figure_7`.
 
 ### 2. Tables (Analyses for data1–data4)
 
-Each `tables/table_k/` folder contains R scripts that reproduce the analyses for Table 1–4.  
-The codes are intended to be run **line by line** in R. Readers can refer to each script for details on which sections generate which parts of the manuscript results.
+Each folder `tables/table_k/` (for k = 1,…,4) contains R scripts that replicate the analyses for Tables 1–4.  
+Execute each script **line by line** in R.  
+Comments in the scripts indicate which code segments correspond to specific reported results.
 
 ---
 
 ### 3. Working Directory Setup
 
-Before running any R script, make sure to set your working directory to the location where both the **data file** (e.g., `data1.csv`) and the **R script** (e.g., `data1.R`) reside.
+Before running any R script, set your working directory to where both the **data** and the **script** are located.
 
 ```r
-# Example for data1
+# Example
 setwd("/path/to/tables/table_1")
 ```
 
-Alternatively, in RStudio, use:
+Or, in RStudio:
+
 ```
 Session → Set Working Directory → To Source File Location
 ```
@@ -106,14 +108,14 @@ Session → Set Working Directory → To Source File Location
 
 ## Software Requirements
 
-- **R** (version ≥ 4.0)
-- Common R packages used by the scripts (see `library(...)` calls at the top of each `.R` file)
+- **R** (version ≥ 4.0)  
+- Common R packages listed in `library(...)` calls at the top of each `.R` file  
 - (Optional) **renv** for reproducible environments:
   ```r
   install.packages("renv")
   renv::restore()
   ```
-- **LaTeX** distribution (TeX Live or MiKTeX) with `pdflatex` or `latexmk` for compiling `.tex` figures
+- **LaTeX** distribution (TeX Live or MiKTeX) with `pdflatex` or `latexmk` for compiling figures
 
 ---
 
@@ -122,10 +124,10 @@ Session → Set Working Directory → To Source File Location
 The dataset is available upon request for research purposes.
 
 - **Data queries:** [luoj1129@gmail.com](mailto:luoj1129@gmail.com)  
-  Please mention the manuscript title and describe your intended use briefly.
+  Include the manuscript title and a short description of intended use.
 
 > Some scripts will not run to completion without the data files (`tables/data1.csv`–`data4.csv`).  
-> The `data_dictionary.pdf` file provides variable definitions and coding details.
+> See `data_dictionary.pdf` for variable definitions and coding details.
 
 ---
 
@@ -140,11 +142,12 @@ The dataset is available upon request for research purposes.
 
 If you use this code or build upon the analyses, please cite:
 
-> *Striational Antibody-Associated Myositis – Bridging the Gap between Thymoma and Myasthenia Gravis: A Systematic Review and Statistical Analysis.* (Submitted to **BMJ**)
+> *Striational Antibody-Associated Myositis – Bridging the Gap between Thymoma and Myasthenia Gravis: A Systematic Review and Statistical Analysis.*  
+> (Submitted to **BMJ**)
 
 ---
 
 ## Disclaimer
 
 This repository is provided for academic and research use.  
-Results may change as the manuscript undergoes peer review and revisions.
+Results may change as the manuscript undergoes peer review and revision.
