@@ -45,7 +45,8 @@ This repository contains the analysis code and figure/table generation scripts a
 ## How to Reproduce Results
 
 > You’ll need local copies of the data files in the `tables/` directory (see **Data Access** below).  
-> All scripts are intended to be run **line by line in R** to help users inspect intermediate outputs and verify reproducibility.
+> All scripts are intended to be run **line by line in R** to help users inspect intermediate outputs and verify reproducibility.  
+> Readers can find in each script which lines of code correspond to specific results reported in the manuscript.
 
 ### 1. Figures (Figure S1, Figures 2–7)
 
@@ -82,18 +83,8 @@ Repeat for `figure_S1`, `figure_3`, …, `figure_7`.
 
 ### 2. Tables (Analyses for data1–data4)
 
-Each `tables/table_k/` folder contains R scripts that reproduce the analyses for Table 1–4.
-
-**Typical workflow:**
-```bash
-# Example: Concomitant IIM and MG (Table 1)
-Rscript tables/table_1/run_table_1.R
-
-# Example: ICI-Induced IIM and/or MG (Table 2)
-Rscript tables/table_2/run_table_2.R
-```
-
-Each script produces summary statistics and outputs used in the manuscript.
+Each `tables/table_k/` folder contains R scripts that reproduce the analyses for Table 1–4.  
+The codes are intended to be run **line by line** in R. Readers can refer to each script for details on which sections generate which parts of the manuscript results.
 
 ---
 
