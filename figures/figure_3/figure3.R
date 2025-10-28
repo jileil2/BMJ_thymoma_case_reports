@@ -2,179 +2,56 @@
 setwd("/Users/jileilin/Desktop/Research/thymomal case reports/")
 
 ##################### load packages
-library("strucchange")
-library('nnet')
-library('quantreg')
-library('multcomp')
-library('forestplot')
+library('grDevices')
 
 #################### read data
-data <- read.csv('data1.csv')[, -1]
+data <- read.csv('data4.csv')[, -1]
 
 
-#################### forest plot (Figure 3A)
-thymoma.ind <- ifelse(data$thymoma == '+', 1, 0)
-# covariates
-death <- ifelse(data$outcome == 'Death', 1, 0)
-covariates <- with(data, data.frame(Sex, EOMG, Oplus, 
-                                    Striated, GG, Cardiac, death))
-covariates$GG[which(covariates$GG == 'nobiopsy')] <- NA
-# subset
-subset <- which(data$year >= 1993)
+#################### figure 4
+# ordinary least squares
+lmod <- lm(change ~ log(interval), data = data)
+
+# prepare figures
+subset <- with(data, which(is.na(change) == FALSE & is.na(interval) == FALSE))
+
+# confidence shade
+confshade <- function(x, ylo, yhi, col = 8) {
+  #
+  # Draw a [Shade]d [Conf]idence band.
+  n <- length(x)
+  for (i in 1:(n-1)) {
+    polygon(c(x[i], x[i + 1], x[i + 1], x[i]),
+            c(ylo[i], ylo[i + 1], yhi[i + 1], yhi[i]),
+            col = col,
+            border = F)
+  }
+}
 
 # plot
-mean <- c()
-lower <- c()
-upper <- c()
-pvs <- c()
-for (j in 1:7) {
-  
-  # logistic regression
-  if (j == 1) {
-    mod.j <- glm(thymoma.ind ~ covariates[, j] + Age.TP, data = data, 
-                 family = 'binomial',
-                 subset = subset, control = glm.control(maxit = 50))
-  } else if (j == 2) {
-    mod.j <- glm(thymoma.ind ~ covariates[, j] + Sex, family = 'binomial',
-                 subset = subset, data = data, control = glm.control(maxit = 50))
-    
-  } else if (j >= 7) {
-    mod.j <- glm(thymoma.ind ~ covariates[, j] + Age.TP + Sex, family = 'binomial',
-                 subset = subset, data = data, control = glm.control(maxit = 50))
-  } else {
-    mod.j <- glm(thymoma.ind ~ covariates[, j] + Age.TP + Sex, family = 'binomial',
-                 data = data, control = glm.control(maxit = 50))
-  }
-  
-  # confidence intervals
-  cis.j <- apply(confint(mod.j), 2, exp)[2, ]
-  mean[j] <- exp(coef(mod.j))[-1][1]
-  lower[j] <- cis.j[1]
-  upper[j] <- cis.j[2]
-  
-  # p-values
-  pvs[j] <- coef(summary(mod.j))[2, 4]
-}
+plot(log(interval[subset]), fitted.values(lmod), type = 'l',
+     main = 'Tumor Size against Interval',
+     ylab = 'Reduction of tumor size (%)',
+     xlab = 'log[Interval (months)]',
+     ylim = c(-100, 0), lwd = 3,
+     col = 'magenta')
+box(lwd = 4)
+points(y = change[subset], x = log(interval[subset]),
+       col = 'magenta')
+text(x = 2.8, y = -26, 'Adjusted R^2 = 0.12')
+text(x = 2.49, y = -18, 'Slope = -6.54')
+text(x = 2.50, y = -10, 'p-value = 0.01')
+abline(v = -0.772, lty = 2)
+abline(h = -50, lty = 2)
 
-# p-value
-pvs <- round(pvs, 4)
+# prediction interval
+pred_conf <- predict(lmod, 
+                     interval = "confidence", 
+                     level = 0.95)
 
-# forest plot
-base_data <- tibble::tibble(mean  = mean, lower = lower, upper = upper,
-                            OR = round(mean, 2), pvs = pvs,
-                            variable = c('Female', 'LOMG', 
-                                         'MG-like Ocular symptoms', 
-                                         'StrAb', 'Giant cells/granulomas', 
-                                         'Cardiac involvement', 'Death (after 1993)'))
-base_data |>
-  forestplot(labeltext = c(variable, OR, pvs),
-             align = c("l", "c", "c"),     # <-- Align columns
-             xlim = c(0, 25),
-             title = expression(bold("Thymoma")),
-             xlab = expression(bold("Association with thymoma versus no thymoma")),
-             xlog = TRUE,
-             boxsize = 0.5,
-             lwd.ci = 5,                       # Thicker CI lines
-             xticks = c(0.2, 0.5, 1, 2, 10, 40),
-             zero = 1,       
-             lty.zero = 2, 
-             col = fpColors(zero = "black"),  # Location of vertical line
-             lwd.zero = 5,                     # <--- Thicker vertical line
-             txt_gp = fpTxtGp(
-               xlab = gpar(fontsize = 12),
-               ticks = gpar(fontsize = 12),    # <--- Larger axis tick labels
-               label = gpar(fontsize = 12)
-             ) # Enlarge axis tick labels
-  ) |>
-  fp_set_style(box = "royalblue",
-               line = "darkblue",
-               summary = "royalblue") |>
-  fp_add_header(variable = c("", "Variable"),
-                OR = c("", "Adj-OR"),
-                pvs = c("", "p-value")) |>
-  fp_set_zebra_style("#EFEFEF")
-
-
-#################### forest plot (Figure 3B)
-# subset
-subset <- which(data$year >= 1993)
-myocarditis.ind <- ifelse(data$myocarditis == 'Myocarditis', 1, 0)
-
-# covariates
-death <- ifelse(data$outcome == 'Death', 1, 0)
-covariates <- with(data, data.frame(scale(Age), Sex, EOMG, thymoma, GG, 
-                                    cort, imm, rs,
-                                    death))
-covariates$GG[which(covariates$GG == 'nobiopsy')] <- NA
-
-# logistic regression
-mean <- c()
-lower <- c()
-upper <- c()
-pvs <- c()
-for (j in 1:9) {
-  if (j %in% c(1, 3)) {
-    mod.j <- glm(myocarditis.ind ~ covariates[, j] + Sex, family = 'binomial',
-                 subset = subset, data = data, control = glm.control(maxit = 50))
-    
-  } else if (j == 2) {
-    mod.j <- glm(myocarditis.ind ~ covariates[, j] + Age, family = 'binomial',
-                 subset = subset, data = data, control = glm.control(maxit = 50))
-  } else if (j >= 6) {
-    mod.j <- glm(myocarditis.ind ~ covariates[, j] + Sex + Age, family = 'binomial',
-                 subset = subset, data = data, control = glm.control(maxit = 50))
-  } else {
-    mod.j <- glm(myocarditis.ind ~ covariates[, j] + Sex + Age, family = 'binomial',
-                 data = data, control = glm.control(maxit = 50))
-  }
-  cis.j <- apply(confint(mod.j), 2, exp)[2, ]
-  
-  # confidence intervals
-  mean[j] <- exp(coef(mod.j))[-1][1]
-  lower[j] <- cis.j[1]
-  upper[j] <- cis.j[2]
-  
-  # p-value
-  pvs[j] <- coef(summary(mod.j))[2, 4]
-}
-pvs <- round(pvs, 4)
-
-# forest plot
-base_data <- tibble::tibble(mean  = mean,
-                            lower = lower,
-                            upper = upper,
-                            OR = round(mean, 2),
-                            pvs = pvs,
-                            variable = c('Age', 'Female', 'LOMG', 'Thymoma', 
-                                         'Giant cells/granulomas',  'Corticosteroids (after 1993)',
-                                         'Immunomodulators (after 1993)',
-                                         'Respiratory support (after 1993)',
-                                         'Death (after 1993)'))
-
-base_data |>
-  forestplot(labeltext = c(variable, OR, pvs),
-             align = c("l", "c", "c"),     
-             xlim = c(0, 50),
-             title = expression(bold("Myocarditis")),
-             xlab = expression(bold("Association with myocarditis versus no myocarditis")),
-             xlog = TRUE,
-             boxsize = .5,
-             lwd.ci = 5,                       
-             xticks = c(0.25, 0.5, 1, 2, 5, 50),
-             zero = 1,       
-             lty.zero = 2, 
-             col = fpColors(zero = "black"),  
-             lwd.zero = 5,                     
-             txt_gp = fpTxtGp(
-               xlab = gpar(fontsize = 12),
-               ticks = gpar(fontsize = 12),    
-               label = gpar(fontsize = 12)
-             ) # Enlarge axis tick labels
-  ) |>
-  fp_set_style(box = "royalblue",
-               line = "darkblue",
-               summary = "royalblue") |>
-  fp_add_header(variable = c("", "Variable"),
-                OR = c("", "Adj-OR"),
-                pvs = c("", "p-value")) |>
-  fp_set_zebra_style("#EFEFEF")
+# turn into data.frame
+pred_conf_df <- as.data.frame(pred_conf)
+confshade(log(interval[subset]),
+          ylo = pred_conf_df$lwr,
+          yhi = pred_conf_df$upr,
+          col = adjustcolor("magenta", alpha.f = 0.3))

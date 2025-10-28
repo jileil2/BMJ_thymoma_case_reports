@@ -7,7 +7,6 @@ library('nnet')
 library('quantreg')
 library('multcomp')
 library('forestplot')
-library('ggplot2')
 
 #################### read data
 data <- read.csv('data2.csv')[, -1]
@@ -36,10 +35,9 @@ cancer.detailed <- reorder(cancer.detailed, ll)
 contrasts(cancer.detailed) <- contr.sum(6)
 data$cancer.detailed <- cancer.detailed
 
-
-#################### forest plot for sex
-sex.ind <- ifelse(data$Sex == 'F', 1, 0)
-mod <- glm(sex.ind ~ cancer.detailed + Age, family = 'binomial', 
+#################### forest plot for myositis
+my.ind <- ifelse(data$inflam.myopathy == '+', 1, 0)
+mod <- glm(my.ind ~ cancer.detailed + Sex + Age + CTLA4_PD1, family = 'binomial', 
            data = data, subset = subset)
 
 # p-value
@@ -63,161 +61,516 @@ base_data <- tibble::tibble(mean  = mean, lower = lower, upper = upper,
                                          'Melanoma', 'Gastrointestinal cancer',
                                          'Genitourinary cancer'))
 
-#################### violin plot for age
-Age <- data$Age
-non.derm.IBM <- data$non.derm.IBM
-subset <- which(non.derm.IBM == '-')
+base_data |>
+  forestplot(labeltext = c(variable, OR, pvs),
+             align = c("l", "c", "c"),     
+             xlim = c(0, 12),
+             title = expression(bold("Myositis")),
+             xlab = expression(bold("Association with myositis")),
+             xlog = TRUE,
+             boxsize = 0.35,
+             lwd.ci = 5,                       
+             xticks = c(0.1, 0.2, 0.5, 1, 2, 5, 10),
+             zero = 1,       
+             lty.zero = 2, 
+             col = fpColors(zero = "black"),  
+             lwd.zero = 4,                    
+             txt_gp = fpTxtGp(
+               xlab = gpar(fontsize = 12),
+               ticks = gpar(fontsize = 12),    
+               label = gpar(fontsize = 12)
+             ) 
+  ) |>
+  fp_set_style(box = "royalblue",
+               line = "darkblue",
+               summary = "royalblue") |>
+  fp_add_header(variable = c("", "Cancer type"),
+                OR = c("", "Adj-OR"),
+                pvs = c("", "p-value")) |>
+  fp_set_zebra_style("#EFEFEF")
 
-# quantile regression
-mod <- rq(Age ~ cancer.detailed + Sex, tau = 0.50, subset = subset, data = data)
+
+#################### forest plot for myocarditis
+myocarditis.ind <- ifelse(data$myocarditis == '+', 1, 0)
+mod <- glm(myocarditis.ind ~ cancer.detailed + Sex + Age + CTLA4_PD1, 
+           family = 'binomial', subset = subset, data = data)
+
 # p-value
-p <- coef(summary.rq(mod, se = 'ker'))[2:6, 4]
-names(p) <- c('thymic vs overall', 'lung vs overall', 'melanoma vs overall',                     
-              'gastrointestinal vs overall', 'genitourinary vs overall')
-print(p)
-
-# Build data
-p <- c(p, NA)
-df <- with(data, data.frame(cancer = cancer.detailed[subset],
-                 age = Age[subset]))
-df <- na.omit(df)
-
-# Main 5 cancer types
-main_groups <- c("thymic", "lung", "melanoma", "gastrointestinal", "genitourinary")
-df_main <- df[df$cancer %in% main_groups, ]
-df_main$group <- factor(df_main$cancer, levels = main_groups)
-df_all <- df
-df_all$group <- "All"
-df_plot <- rbind(df_main, df_all)
-df_plot$group <- factor(df_plot$group, levels = c(main_groups, "All"))
-
-# Colors (keep your palette)
-cols <- c('magenta', 'deepskyblue', 'indianred1',
-          'royalblue', 'slateblue', 'darkslategray3')
-names(cols) <- levels(df_plot$group)
-
-top_y <- max(df$age, na.rm = TRUE) + 15
-pval_df <- data.frame(group = levels(df_plot$group),
-                      label = paste0("p = ", format(p, digits = 2, scientific = FALSE)),
-                      y = top_y)
-x_labs <- c(thymic = "TET", lung = "Lung cancer",
-            melanoma = "Melanoma", 
-            gastrointestinal = "Gastrointestinal cancer",
-            genitourinary = "Genitourinary cancer",
-            All = "All")
-
-# Plot
-p_age <- ggplot(df_plot, aes(x = group, y = age)) +
-  geom_violin(
-    aes(color = group),
-    fill = "white",
-    trim = FALSE,
-    draw_quantiles = c(0.25, 0.5, 0.75),
-    linewidth = 1.2,
-    show.legend = FALSE
-  ) +
-  geom_jitter(
-    aes(color = group),
-    position = position_jitter(width = 0.15),
-    size = 1.2,
-    alpha = 0.8,
-    show.legend = FALSE
-  ) +
-  scale_color_manual(values = cols) +
-  geom_text(data = pval_df, aes(x = group, y = y, label = label), vjust = 0) +
-  scale_x_discrete(labels = x_labs) +
-  labs(x = "", y = "Age (year)", title = "Age") +
-  theme_bw() +
-  theme(
-    legend.position = "none",
-    panel.grid      = element_blank(),
-    panel.border    = element_rect(color = "black", fill = NA, size = 1.2),
-    axis.text.x     = element_text(angle = 45, hjust = 1, vjust = 1,
-                                   margin = margin(t = 6)),
-    axis.text.y     = element_text(size = 14),
-    axis.title.x    = element_text(size = 16),
-    axis.title.y    = element_text(size = 16),
-    plot.title      = element_text(hjust = 0.5, size = 18),
-    plot.margin     = margin(t = 6, r = 8, b = 16, l = 8))
-print(p_age)
-
-#################### forest plot for ICI therapy
-cancer.type2 <- as.character(data$cancer.detailed)
-cancer.type2[which(cancer.type2 == 'thymic')] <- NA
-ll <- c()
-for (i in 1:nrow(data)) {
-  if (is.na(cancer.type2[i]) == TRUE) {
-    ll[i] <- NA
-  } else if (cancer.type2[i] == 'thymic') {
-    ll[i] <- NA
-  } else if (cancer.type2[i] == 'lung') {
-    ll[i] <- 1
-  } else if (cancer.type2[i] == 'melanoma') {
-    ll[i] <- 2
-  } else if (cancer.type2[i] == 'gastrointestinal') {
-    ll[i] <- 3
-  } else if (cancer.type2[i] == 'genitourinary') {
-    ll[i] <- 4
-  } else if (cancer.type2[i] == 'others') {
-    ll[i] <- 5
-  }
-}
-cancer.type2 <- reorder(cancer.type2, ll)
-contrasts(cancer.type2) <- contr.sum(5)
-
-# logistic regression
-treat.ind <- ifelse(data$treatment == 'PD-1 & CTLA-4', 0, 1)
-mod <- glm(treat.ind ~ cancer.type2 + Sex + Age, 
-           family = 'binomial', data = data, subset = subset)
-
-# p-value odds ratio
-p <- coef(summary(mod))[2:5, 4]
-odds <- coef(summary(mod))[2:5, 1]
-ses <- coef(summary(mod))[2:5, 2]
+p <- coef(summary(mod))[2:6, 4]
+# odds ratio
+odds <- coef(summary(mod))[2:6, 1]
+ses <- coef(summary(mod))[2:6, 2]
 odds <- cbind(odds, odds - qnorm(.975) * ses, odds + qnorm(.975) * ses)
 odds <- exp(odds)
 
 # forest plot
-odds <- rbind(c(NA, NA, NA), odds)
 mean <- odds[, 1]
 lower <- odds[, 2]
 upper <- odds[, 3]
 pvs <- p
 pvs <- round(pvs, 4)
-pvs <- c(NA, pvs)
+base_data <- tibble::tibble(mean  = mean, lower = lower, upper = upper,
+                            OR = round(mean, 2), pvs = pvs,
+                            variable = c('TET', 'Lung cancer', 
+                                         'Melanoma', 'Gastrointestinal cancer',
+                                         'Genitourinary cancer'))
+
+base_data |>
+  forestplot(labeltext = c(variable, OR, pvs),
+             align = c("l", "c", "c"),     
+             xlim = c(0, 50),
+             title = expression(bold("Myocarditis")),
+             xlab = expression(bold("Association with myocarditis versus no myocarditis")),
+             xlog = TRUE,
+             boxsize = .5,
+             lwd.ci = 5,                       
+             xticks = c(0.25, 0.5, 1, 2, 5, 50),
+             zero = 1,       
+             lty.zero = 2, 
+             col = fpColors(zero = "black"),  
+             lwd.zero = 5,                     
+             txt_gp = fpTxtGp(
+               xlab = gpar(fontsize = 12),
+               ticks = gpar(fontsize = 12),    
+               label = gpar(fontsize = 12)
+             ) # Enlarge axis tick labels
+  ) |>
+  fp_set_style(box = "royalblue",
+               line = "darkblue",
+               summary = "royalblue") |>
+  fp_add_header(variable = c("", "Variable"),
+                OR = c("", "Adj-OR"),
+                pvs = c("", "p-value")) |>
+  fp_set_zebra_style("#EFEFEF")
 
 
-base_data <- tibble::tibble(mean  = mean,
-                            lower = lower,
-                            upper = upper,
-                            OR = round(mean, 2),
-                            pvs = pvs,
-                            variable = c('TET (100%) *', 
-                                         'Lung cancer (89%) *', 
-                                         'Melanoma (56%) *', 
-                                         'Gastrointestinal cancer (91%) *',
-                                         'Genitourinary cancer (76%) *'))
+#################### forest plot for MG
+mg.ind <- ifelse(data$MG == '+', 1, 0)
+mod <- glm(mg.ind ~ cancer.detailed + Sex + Age + CTLA4_PD1, 
+           family = 'binomial', subset = subset, data = data)
+
+# p-value
+p <- coef(summary(mod))[2:6, 4]
+
+# odds ratio
+odds <- coef(summary(mod))[2:6, 1]
+ses <- coef(summary(mod))[2:6, 2]
+odds <- cbind(odds, odds - qnorm(.975) * ses, odds + qnorm(.975) * ses)
+odds <- exp(odds)
+
+# forest plot
+mean <- odds[, 1]
+lower <- odds[, 2]
+upper <- odds[, 3]
+pvs <- p
+pvs <- round(pvs, 4)
+base_data <- tibble::tibble(mean  = mean, lower = lower, upper = upper,
+                            OR = round(mean, 2), pvs = pvs,
+                            variable = c('TET', 'Lung cancer', 
+                                         'Melanoma', 'Gastrointestinal cancer',
+                                         'Genitourinary cancer'))
+
+base_data |>
+  forestplot(labeltext = c(variable, OR, pvs),
+             align = c("l", "c", "c"),     
+             xlim = c(0, 12),
+             title = expression(bold("MG")),
+             xlab = expression(bold("Association with MG")),
+             xlog = TRUE,
+             boxsize = 0.35,
+             lwd.ci = 5,                       
+             xticks = c(0.1, 0.2, 0.5, 1, 2, 5, 10),
+             zero = 1,       
+             lty.zero = 2, 
+             col = fpColors(zero = "black"),  
+             lwd.zero = 4,                     
+             txt_gp = fpTxtGp(
+               xlab = gpar(fontsize = 12),
+               ticks = gpar(fontsize = 12),    
+               label = gpar(fontsize = 12)
+             ) # Enlarge axis tick labels
+  ) |>
+  fp_set_style(box = "royalblue",
+               line = "darkblue",
+               summary = "royalblue") |>
+  fp_add_header(variable = c("", "Cancer type"),
+                OR = c("", "Adj-OR"),
+                pvs = c("", "p-value")) |>
+  fp_set_zebra_style("#EFEFEF")
+
+
+#################### forest plot for concurrent myositis & myocarditis
+mwm.ind <- ifelse(data$mwm == '+', 1, 0)
+mod <- glm(mwm.ind ~ cancer.detailed + Sex + Age + CTLA4_PD1, family = 'binomial', 
+           subset = subset, data = data)
+
+# p-value
+p <- coef(summary(mod))[2:6, 4]
+
+# odds ratio
+odds <- coef(summary(mod))[2:6, 1]
+ses <- coef(summary(mod))[2:6, 2]
+odds <- cbind(odds, odds - qnorm(.975) * ses, odds + qnorm(.975) * ses)
+odds <- exp(odds)
+
+# forest plot
+mean <- odds[, 1]
+lower <- odds[, 2]
+upper <- odds[, 3]
+pvs <- p
+pvs <- round(pvs, 4)
+base_data <- tibble::tibble(mean  = mean, lower = lower, upper = upper,
+                            OR = round(mean, 2), pvs = pvs,
+                            variable = c('TET', 'Lung cancer', 
+                                         'Melanoma', 'Gastrointestinal cancer',
+                                         'Genitourinary cancer'))
 
 base_data |>
   forestplot(labeltext = c(variable, OR, pvs),
              align = c("l", "c", "c"),     # <-- Align columns
              xlim = c(0, 12),
-             title = expression(bold("ICI therapy")),
-             xlab = expression(bold("Association with ICI Monotherapy versus ICI combination therapy"))
-             ,
+             title = expression(bold("Concurrent myositis & myocarditis")),
+             xlab = expression(bold("Association with concurrent myositis & myocarditis")),
              xlog = TRUE,
-             boxsize = .35,
+             boxsize = 0.35,
              lwd.ci = 5,                       # Thicker CI lines
              xticks = c(0.1, 0.2, 0.5, 1, 2, 5, 10),
              zero = 1,       
              lty.zero = 2, 
-             col = fpColors(zero = "black"),  # Location of vertical line
-             lwd.zero = 4,                     # <--- Thicker vertical line
+             col = fpColors(zero = "black"),  
+             lwd.zero = 4,                     
              txt_gp = fpTxtGp(
                xlab = gpar(fontsize = 12),
-               ticks = gpar(fontsize = 12),    # <--- Larger axis tick labels
+               ticks = gpar(fontsize = 12),    
                label = gpar(fontsize = 12)
-             ) # Enlarge axis tick labels
+             )  
+  ) |>
+  fp_set_style(box = "royalblue",
+               line = "darkblue",
+               summary = "royalblue") |>
+  fp_add_header(variable = c("", "Cancer type"),
+                OR = c("", "Adj-OR"),
+                pvs = c("", "p-value")) |>
+  fp_set_zebra_style("#EFEFEF")
+
+
+#################### forest plot for concurrent MG & myositis/myocarditis
+mgmm.ind <- ifelse(data$mgmm == '+', 1, 0)
+mod <- glm(mgmm.ind ~ cancer.detailed + Sex + Age + CTLA4_PD1, family = 'binomial', 
+           data = data, subset = subset, control = glm.control(maxit = 50))
+
+# p-value
+p <- coef(summary(mod))[2:6, 4]
+
+# odds ratio
+odds <- coef(summary(mod))[2:6, 1]
+ses <- coef(summary(mod))[2:6, 2]
+odds <- cbind(odds, odds - qnorm(.975) * ses, odds + qnorm(.975) * ses)
+odds <- exp(odds)
+
+# forest plot
+mean <- odds[, 1]
+lower <- odds[, 2]
+upper <- odds[, 3]
+pvs <- p
+pvs <- round(pvs, 4)
+base_data <- tibble::tibble(mean  = mean, lower = lower, upper = upper,
+                            OR = round(mean, 2), pvs = pvs,
+                            variable = c('TET', 'Lung cancer', 
+                                         'Melanoma', 'Gastrointestinal cancer',
+                                         'Genitourinary cancer'))
+base_data |>
+  forestplot(labeltext = c(variable, OR, pvs),
+             align = c("l", "c", "c"),     # <-- Align columns
+             xlim = c(0, 12),
+             title = expression(bold("Concurrent MG & myositis/myocarditis")),
+             xlab = expression(bold("Association with concurrent MG & myositis/myocarditis")),
+             xlog = TRUE,
+             boxsize = 0.35,
+             lwd.ci = 5,                       
+             xticks = c(0.1, 0.2, 0.5, 1, 2, 5, 10),
+             zero = 1,       
+             lty.zero = 2, 
+             col = fpColors(zero = "black"), 
+             lwd.zero = 4,                    
+             txt_gp = fpTxtGp(
+               xlab = gpar(fontsize = 12),
+               ticks = gpar(fontsize = 12),    
+               label = gpar(fontsize = 12)
+             ) 
+  ) |>
+  fp_set_style(box = "royalblue",
+               line = "darkblue",
+               summary = "royalblue") |>
+  fp_add_header(variable = c("", "Cancer type"),
+                OR = c("", "Adj-OR"),
+                pvs = c("", "p-value")) |>
+  fp_set_zebra_style("#EFEFEF")
+
+
+
+#################### forest plot for Immunomodulators
+imm.ind <- ifelse(data$imm == '+', 1, 0)
+mod <- glm(imm.ind ~ cancer.detailed + Sex + Age + CTLA4_PD1, family = 'binomial', 
+           data = data, subset = subset, control = glm.control(maxit = 50))
+
+# p-value
+p <- coef(summary(mod))[2:6, 4]
+
+# odds ratio
+odds <- coef(summary(mod))[2:6, 1]
+ses <- coef(summary(mod))[2:6, 2]
+odds <- cbind(odds, odds - qnorm(.975) * ses, odds + qnorm(.975) * ses)
+odds <- exp(odds)
+
+# forest plot
+mean <- odds[, 1]
+lower <- odds[, 2]
+upper <- odds[, 3]
+pvs <- p
+pvs <- round(pvs, 4)
+base_data <- tibble::tibble(mean  = mean, lower = lower, upper = upper,
+                            OR = round(mean, 2), pvs = pvs,
+                            variable = c('TET', 'Lung cancer', 
+                                         'Melanoma', 'Gastrointestinal cancer',
+                                         'Genitourinary cancer'))
+
+base_data |>
+  forestplot(labeltext = c(variable, OR, pvs),
+             align = c("l", "c", "c"),    
+             xlim = c(0, 12),
+             title = expression(bold("Immunomodulators")),
+             xlab = expression(bold("Association with immunomodulators")),
+             xlog = TRUE,
+             boxsize = 0.35,
+             lwd.ci = 5,                       
+             xticks = c(0.1, 0.2, 0.5, 1, 2, 5, 10),
+             zero = 1,       
+             lty.zero = 2, 
+             col = fpColors(zero = "black"),  
+             lwd.zero = 4,                     
+             txt_gp = fpTxtGp(
+               xlab = gpar(fontsize = 12),
+               ticks = gpar(fontsize = 12),    
+               label = gpar(fontsize = 12)
+             )  ) |>
+  fp_set_style(box = "royalblue",
+               line = "darkblue",
+               summary = "royalblue") |>
+  fp_add_header(variable = c("", "Cancer type"),
+                OR = c("", "Adj-OR"),
+                pvs = c("", "p-value")) |>
+  fp_set_zebra_style("#EFEFEF")
+
+
+
+#################### forest plot for plasmapheresis
+plasmapheresis.ind <- ifelse(data$plasmapheresis == '+', 1, 0)
+mod <- glm(plasmapheresis.ind ~ cancer.detailed + Sex + Age + CTLA4_PD1, 
+           family = 'binomial', control = glm.control(maxit = 50), data = data,
+           subset = subset)
+
+# p-value
+p <- coef(summary(mod))[2:6, 4]
+
+# odds ratio
+odds <- coef(summary(mod))[2:6, 1]
+ses <- coef(summary(mod))[2:6, 2]
+odds <- cbind(odds, odds - qnorm(.975) * ses, odds + qnorm(.975) * ses)
+odds <- exp(odds)
+
+# forest plot
+mean <- odds[, 1]
+lower <- odds[, 2]
+upper <- odds[, 3]
+pvs <- p
+pvs <- round(pvs, 4)
+base_data <- tibble::tibble(mean  = mean, lower = lower, upper = upper,
+                            OR = round(mean, 2), pvs = pvs,
+                            variable = c('TET', 'Lung cancer', 
+                                         'Melanoma', 'Gastrointestinal cancer',
+                                         'Genitourinary cancer'))
+base_data |>
+  forestplot(labeltext = c(variable, OR, pvs),
+             align = c("l", "c", "c"),     
+             title = expression(bold("Plasmapheresis")), 
+             xlim = c(0, 12),
+             xlab = expression(bold("Association with plasmapheresis")),
+             xlog = TRUE,
+             boxsize = 0.35,
+             lwd.ci = 5,                       
+             xticks = c(0.1, 0.2, 0.5, 1, 2, 5, 10),
+             zero = 1,       
+             lty.zero = 2, 
+             col = fpColors(zero = "black"),  
+             lwd.zero = 4,                     
+             txt_gp = fpTxtGp(
+               xlab = gpar(fontsize = 12),
+               ticks = gpar(fontsize = 12),    
+               label = gpar(fontsize = 12)
+             )  
+  ) |>
+  fp_set_style(box = "royalblue",
+               line = "darkblue",
+               summary = "royalblue") |>
+  fp_add_header(variable = c("", "Cancer type"),
+                OR = c("", "Adj-OR"),
+                pvs = c("", "p-value")) |>
+  fp_set_zebra_style("#EFEFEF")
+
+#################### forest plot for respiratory support
+rs.ind <- ifelse(data$rs == '+', 1, 0)
+mod <- glm(rs.ind ~ cancer.detailed + Sex + Age + CTLA4_PD1, family = 'binomial', 
+           control = glm.control(maxit = 50), data = data,
+           subset = subset)
+
+# p-value
+p <- coef(summary(mod))[2:6, 4]
+
+# odds ratio
+odds <- coef(summary(mod))[2:6, 1]
+ses <- coef(summary(mod))[2:6, 2]
+odds <- cbind(odds, odds - qnorm(.975) * ses, odds + qnorm(.975) * ses)
+odds <- exp(odds)
+
+# forest plot
+mean <- odds[, 1]
+lower <- odds[, 2]
+upper <- odds[, 3]
+pvs <- p
+pvs <- round(pvs, 4)
+base_data <- tibble::tibble(mean  = mean, lower = lower, upper = upper,
+                            OR = round(mean, 2), pvs = pvs,
+                            variable = c('TET', 'Lung cancer', 
+                                         'Melanoma', 'Gastrointestinal cancer',
+                                         'Genitourinary cancer'))
+base_data |>
+  forestplot(labeltext = c(variable, OR, pvs),
+             align = c("l", "c", "c"),     
+             xlim = c(0, 12),
+             title = expression(bold("Respiratory support")), 
+             xlab = expression(bold("Association with respiratory support")),
+             xlog = TRUE,
+             boxsize = 0.35,
+             lwd.ci = 5,                       
+             xticks = c(0.1, 0.2, 0.5, 1, 2, 5, 10),
+             zero = 1,       
+             lty.zero = 2, 
+             col = fpColors(zero = "black"),  
+             lwd.zero = 4,                     
+             txt_gp = fpTxtGp(
+               xlab = gpar(fontsize = 12),
+               ticks = gpar(fontsize = 12),    
+               label = gpar(fontsize = 12)
+             ) 
+  ) |>
+  fp_set_style(box = "royalblue",
+               line = "darkblue",
+               summary = "royalblue") |>
+  fp_add_header(variable = c("", "Cancer type"),
+                OR = c("", "Adj-OR"),
+                pvs = c("", "p-value")) |>
+  fp_set_zebra_style("#EFEFEF")
+
+
+#################### forest plot for cardiovascular treatments
+ct.ind <- ifelse(data$ct == '+', 1, 0)
+mod <- glm(ct.ind ~ cancer.detailed + Sex + Age + CTLA4_PD1, family = 'binomial', data = data,
+           control = glm.control(maxit = 50), subset = subset)
+
+# p-value
+p <- coef(summary(mod))[2:6, 4]
+
+# odds ratio
+odds <- coef(summary(mod))[2:6, 1]
+ses <- coef(summary(mod))[2:6, 2]
+odds <- cbind(odds, odds - qnorm(.975) * ses, odds + qnorm(.975) * ses)
+odds <- exp(odds)
+
+# forest plot
+mean <- odds[, 1]
+lower <- odds[, 2]
+upper <- odds[, 3]
+pvs <- p
+pvs <- round(pvs, 4)
+base_data <- tibble::tibble(mean  = mean, lower = lower, upper = upper,
+                            OR = round(mean, 2), pvs = pvs,
+                            variable = c('TET', 'Lung cancer', 
+                                         'Melanoma', 'GGastrointestinal cancer',
+                                         'Genitourinary cancer'))
+base_data |>
+  forestplot(labeltext = c(variable, OR, pvs),
+             align = c("l", "c", "c"),     
+             xlim = c(0, 12),
+             title = expression(bold("Cardiovascular treatments")),
+             xlab = expression(bold("Association with cardiovascular treatments")),
+             xlog = TRUE,
+             boxsize = 0.35,
+             lwd.ci = 5,                       
+             xticks = c(0.1, 0.2, 0.5, 1, 2, 5, 10),
+             zero = 1,       
+             lty.zero = 2, 
+             col = fpColors(zero = "black"),  
+             lwd.zero = 4,                     
+             txt_gp = fpTxtGp(
+               xlab = gpar(fontsize = 12),
+               ticks = gpar(fontsize = 12),    
+               label = gpar(fontsize = 12)
+             ) 
+  ) |>
+  fp_set_style(box = "royalblue",
+               line = "darkblue",
+               summary = "royalblue") |>
+  fp_add_header(variable = c("", "Cancer type"),
+                OR = c("", "Adj-OR"),
+                pvs = c("", "p-value")) |>
+  fp_set_zebra_style("#EFEFEF")
+
+
+#################### forest plot for death
+death.ind <- ifelse(data$outcome == 'Death', 1, 0)
+mod <- glm(death.ind ~ cancer.detailed + Sex + Age + CTLA4_PD1, family = 'binomial', data = data,
+           control = glm.control(maxit = 50), subset = subset)
+
+# p-value
+p <- coef(summary(mod))[2:6, 4]
+
+# odds ratio
+odds <- coef(summary(mod))[2:6, 1]
+ses <- coef(summary(mod))[2:6, 2]
+odds <- cbind(odds, odds - qnorm(.975) * ses, odds + qnorm(.975) * ses)
+odds <- exp(odds)
+
+# forest plot
+mean <- odds[, 1]
+lower <- odds[, 2]
+upper <- odds[, 3]
+pvs <- p
+pvs <- round(pvs, 4)
+base_data <- tibble::tibble(mean  = mean, lower = lower, upper = upper,
+                            OR = round(mean, 2), pvs = pvs,
+                            variable = c('TET', 'Lung cancer', 
+                                         'Melanoma', 'Gastrointestinal cancer',
+                                         'Genitourinary cancer'))
+base_data |>
+  forestplot(labeltext = c(variable, OR, pvs),
+             align = c("l", "c", "c"),     
+             xlim = c(0, 12),
+             title = expression(bold("irAE-related death & hospice care")), 
+             xlab = expression(bold("Association with irAE-related death & hospice care")),
+             xlog = TRUE,
+             boxsize = 0.35,
+             lwd.ci = 5,                       
+             xticks = c(0.1, 0.2, 0.5, 1, 2, 5, 10),
+             zero = 1,       
+             lty.zero = 2, 
+             col = fpColors(zero = "black"),  
+             lwd.zero = 4,                     
+             txt_gp = fpTxtGp(
+               xlab = gpar(fontsize = 12),
+               ticks = gpar(fontsize = 12),    
+               label = gpar(fontsize = 12)
+             )
   ) |>
   fp_set_style(box = "royalblue",
                line = "darkblue",

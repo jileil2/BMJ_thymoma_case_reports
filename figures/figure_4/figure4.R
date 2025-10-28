@@ -2,56 +2,308 @@
 setwd("/Users/jileilin/Desktop/Research/thymomal case reports/")
 
 ##################### load packages
-library('grDevices')
+library("strucchange")
+library('nnet')
+library('quantreg')
+library('multcomp')
+library('forestplot')
+library('ggplot2')
 
 #################### read data
-data <- read.csv('data4.csv')[, -1]
+data <- read.csv('data2.csv')[, -1]
 
 
-#################### figure 4
-# ordinary least squares
-lmod <- lm(change ~ log(interval), data = data)
 
-# prepare figures
-subset <- with(data, which(is.na(change) == FALSE & is.na(interval) == FALSE))
 
-# confidence shade
-confshade <- function(x, ylo, yhi, col = 8) {
-  #
-  # Draw a [Shade]d [Conf]idence band.
-  n <- length(x)
-  for (i in 1:(n-1)) {
-    polygon(c(x[i], x[i + 1], x[i + 1], x[i]),
-            c(ylo[i], ylo[i + 1], yhi[i + 1], yhi[i]),
-            col = col,
-            border = F)
-  }
-}
 
-# plot
-plot(log(interval[subset]), fitted.values(lmod), type = 'l',
-     main = 'Tumor Size against Interval',
-     ylab = 'Reduction of tumor size (%)',
-     xlab = 'log[Interval (months)]',
-     ylim = c(-100, 0), lwd = 3,
-     col = 'magenta')
-box(lwd = 4)
-points(y = change[subset], x = log(interval[subset]),
-       col = 'magenta')
-text(x = 2.8, y = -26, 'Adjusted R^2 = 0.12')
-text(x = 2.49, y = -18, 'Slope = -6.54')
-text(x = 2.50, y = -10, 'p-value = 0.01')
-abline(v = -0.772, lty = 2)
-abline(h = -50, lty = 2)
 
-# prediction interval
-pred_conf <- predict(lmod, 
-                     interval = "confidence", 
-                     level = 0.95)
+#################### forest plot
+#################### testing bias for Anti-AChR
+test.achr <- ifelse(is.na(data$AChR) == TRUE, 0, 1)
 
-# turn into data.frame
-pred_conf_df <- as.data.frame(pred_conf)
-confshade(log(interval[subset]),
-          ylo = pred_conf_df$lwr,
-          yhi = pred_conf_df$upr,
-          col = adjustcolor("magenta", alpha.f = 0.3))
+# combining odds ratio and p-values
+pp <- c()
+oddss <- c()
+
+# Isolated myositis
+# logistic regression
+Op.ind <- ifelse(data$Op == '+', 1, 0)
+mod <- glm(Op.ind ~ test.achr + Sex + Age, data = data, 
+           subset = which(data$mm == 'Myositis (no D and no C)'),
+           family = 'binomial')
+
+# p-value
+p <- coef(summary(mod))[2, 4]
+print(p)
+# odds ratio
+odds <- coef(summary(mod))[2, 1]
+ses <- coef(summary(mod))[2, 2] 
+odds <- cbind(odds, odds - qnorm(.975) * ses, odds + qnorm(.975) * ses)
+odds <- exp(odds)
+# combine
+oddss <- rbind(oddss, odds)
+pp <- c(pp, p)
+
+
+# Isolated myocarditis
+# logistic regression
+mod <- glm(Op.ind ~ test.achr + Sex + Age, data = data, 
+           subset = which(data$mm == 'Myocarditis (only C)'),
+           family = 'binomial')
+# p-value
+p <- coef(summary(mod))[2, 4]
+# odds ratio
+odds <- coef(summary(mod))[2, 1]
+ses <- coef(summary(mod))[2, 2] 
+odds <- cbind(odds, odds - qnorm(.975) * ses, odds + qnorm(.975) * ses)
+odds <- exp(odds)
+# combine
+oddss <- rbind(oddss, odds)
+pp <- c(pp, p)
+
+
+# concurrent myositis & myocarditis
+# logistic regression
+mod <- glm(Op.ind ~ test.achr + Sex + Age, data = data,
+           subset = which(data$mm == 'Myositis with myocarditis'),
+           family = 'binomial')
+
+# p-value
+p <- coef(summary(mod))[2, 4]
+# odds ratio
+odds <- coef(summary(mod))[2, 1]
+ses <- coef(summary(mod))[2, 2] 
+odds <- cbind(odds, odds - qnorm(.975) * ses, odds + qnorm(.975) * ses)
+odds <- exp(odds)
+oddss <- rbind(oddss, odds)
+pp <- c(pp, p)
+
+
+# forest plot
+mean <- oddss[, 1]
+lower <- oddss[, 2]
+upper <- oddss[, 3]
+pvs <- pp
+pvs <- round(pvs, 4)
+base_data <- tibble::tibble(mean  = mean,
+                            lower = lower,
+                            upper = upper,
+                            OR = round(mean, 2),
+                            pvs = pvs,
+                            variable = c('Isolated myositis', 
+                                         'Isolated myocarditis',
+                                         'Concurrent myositis & myocarditis'))
+
+
+base_data |>
+  forestplot(labeltext = c(variable, OR, pvs),
+             align = c("l", "c", "c"),     
+             xlim = c(0, 100),
+             title = expression(bold("Testing Bias for Anti-AChR")),  
+             xlab = expression(bold("Association with MG-like ocular symptoms")),
+             xlog = TRUE,
+             boxsize = 0.2,
+             lwd.ci = 5,                       
+             xticks = c(0.5, 1, 2, 5, 100),
+             zero = 1,       
+             lty.zero = 2, 
+             col = fpColors(zero = "black"),  
+             lwd.zero = 4,                     
+             txt_gp = fpTxtGp(
+               xlab = gpar(fontsize = 12),
+               ticks = gpar(fontsize = 12),    
+               label = gpar(fontsize = 12)
+             ) 
+  ) |>
+  fp_set_style(box = "royalblue",
+               line = "darkblue",
+               summary = "royalblue") |>
+  fp_add_header(variable = c("", "Subgroup"),
+                OR = c("", "Adj-OR"),
+                pvs = c("", "p-value")) |>
+  fp_set_zebra_style("#EFEFEF")
+
+
+
+#################### forest plot
+#################### testing bias for StrAbs
+test.Striated <- ifelse(is.na(data$Striated) == TRUE, 0, 1)
+
+# combine odds ratio and p-value
+oddss <- c()
+pp <- c()
+
+# logistic regression
+# isolated myositis
+Op.ind <- ifelse(data$Op == '+', 1, 0)
+mod <- glm(Op.ind ~ test.Striated + Sex + Age, data = data,
+           subset = which(data$mm == 'Myositis (no D and no C)'),
+           family = 'binomial')
+
+# p-value
+p <- coef(summary(mod))[2, 4]
+# odds
+odds <- coef(summary(mod))[2, 1]
+ses <- coef(summary(mod))[2, 2] 
+odds <- cbind(odds, odds - qnorm(.975) * ses, odds + qnorm(.975) * ses)
+odds <- exp(odds)
+# combine
+oddss <- rbind(oddss, odds)
+pp <- c(pp, p)
+
+
+# logistic regression
+# isolated myocarditis
+mod <- glm(Op.ind ~ test.Striated + Sex + Age, data = data,
+           subset = which(data$mm == 'Myocarditis (only C)'),
+           family = 'binomial')
+
+# p-value
+p <- coef(summary(mod))[2, 4]
+# odds ratio
+odds <- coef(summary(mod))[2, 1]
+ses <- coef(summary(mod))[2, 2] 
+odds <- cbind(odds, odds - qnorm(.975) * ses, odds + qnorm(.975) * ses)
+odds <- exp(odds)
+# combine
+oddss <- rbind(oddss, odds)
+pp <- c(pp, p)
+
+# logistic regression
+# concurrent myositis & myocarditis
+mod <- glm(Op.ind ~ test.Striated + Sex + Age, data = data, 
+           subset = which(data$mm == 'Myositis with myocarditis'),
+           family = 'binomial')
+
+# p-value
+p <- coef(summary(mod))[2, 4]
+# odds ratio
+odds <- coef(summary(mod))[2, 1]
+ses <- coef(summary(mod))[2, 2] 
+odds <- cbind(odds, odds - qnorm(.975) * ses, odds + qnorm(.975) * ses)
+odds <- exp(odds)
+# combine
+oddss <- rbind(oddss, odds)
+pp <- c(pp, p)
+
+# forest plot
+mean <- oddss[, 1]
+lower <- oddss[, 2]
+upper <- oddss[, 3]
+pvs <- pp
+pvs <- round(pvs, 4)
+base_data <- tibble::tibble(mean  = mean,
+                            lower = lower,
+                            upper = upper,
+                            OR = round(mean, 2),
+                            pvs = pvs,
+                            variable = c('Isolated myositis', 
+                                         'Isolated myocarditis',
+                                         'Concurrent myositis & myocarditis'))
+base_data |>
+  forestplot(labeltext = c(variable, OR, pvs),
+             align = c("l", "c", "c"),     
+             xlim = c(0, 100),
+             title = expression(bold("Testing Bias for StrAbs")),  
+             xlab = expression(bold("Association with MG-like ocular symptoms")),
+             xlog = TRUE,
+             boxsize = 0.2,
+             lwd.ci = 5,                       
+             xticks = c(0.5, 1, 2, 5, 100),
+             zero = 1,       
+             lty.zero = 2, 
+             col = fpColors(zero = "black"),  
+             lwd.zero = 4,                    
+             txt_gp = fpTxtGp(
+               xlab = gpar(fontsize = 12),
+               ticks = gpar(fontsize = 12),    
+               label = gpar(fontsize = 12)
+             ) 
+  ) |>
+  fp_set_style(box = "royalblue",
+               line = "darkblue",
+               summary = "royalblue") |>
+  fp_add_header(variable = c("", "Subgroup"),
+                OR = c("", "Adj-OR"),
+                pvs = c("", "p-value")) |>
+  fp_set_zebra_style("#EFEFEF")
+
+
+
+#################### forest plot
+#################### Seropositivity
+subset <- which(is.na(data$mm) == FALSE)
+
+# combine odds ratio and p-value
+oddss <- c()
+pp <- c()
+
+# logistic regression
+# Anti-AChR
+Op.ind <- ifelse(data$Op == '+', 1, 0)
+mod <- glm(Op.ind ~ achr + Sex + Age, data = data, subset = subset, family = 'binomial')
+
+# p-value
+p <- coef(summary(mod))[2, 4]
+pp <- c(pp, p)
+# odds ratio
+odds <- coef(summary(mod))[2, 1]
+ses <- coef(summary(mod))[2, 2] 
+odds <- cbind(odds, odds - qnorm(.975) * ses, odds + qnorm(.975) * ses)
+odds <- exp(odds)
+oddss <- rbind(oddss, odds)
+
+# logistic regression
+# StrAb
+mod <- glm(Op.ind ~ Striated + Sex + Age, data = data, subset = subset, family = 'binomial')
+
+# p-value
+p <- coef(summary(mod))[2, 4]
+pp <- c(pp, p)
+# odds ratio
+odds <- coef(summary(mod))[2, 1]
+ses <- coef(summary(mod))[2, 2] 
+odds <- cbind(odds, odds - qnorm(.975) * ses, odds + qnorm(.975) * ses)
+odds <- exp(odds)
+oddss <- rbind(oddss, odds)
+
+
+# forest plot
+mean <- oddss[, 1]
+lower <- oddss[, 2]
+upper <- oddss[, 3]
+pvs <- pp
+pvs <- round(pvs, 4)
+base_data <- tibble::tibble(mean  = mean,
+                            lower = lower,
+                            upper = upper,
+                            OR = round(mean, 2),
+                            pvs = pvs,
+                            variable = c('Anti-AChR', 'StrAb'))
+base_data |>
+  forestplot(labeltext = c(variable, OR, pvs),
+             align = c("l", "c", "c"),     
+             xlim = c(0, 36),
+             title = expression(bold("Seropositivity")),  
+             xlab = expression(bold("Association with MG-like ocular symptoms")),
+             xlog = TRUE,
+             boxsize = 0.2,
+             lwd.ci = 5,                       
+             xticks = c(0.1, 0.2, 0.5, 1, 2, 5, 10),
+             zero = 1,       
+             lty.zero = 2, 
+             col = fpColors(zero = "black"),  
+             lwd.zero = 4,                     
+             txt_gp = fpTxtGp(
+               xlab = gpar(fontsize = 12),
+               ticks = gpar(fontsize = 12),    
+               label = gpar(fontsize = 12)
+             ) 
+  ) |>
+  fp_set_style(box = "royalblue",
+               line = "darkblue",
+               summary = "royalblue") |>
+  fp_add_header(variable = c("", "Autoantibody"),
+                OR = c("", "Adj-OR"),
+                pvs = c("", "p-value")) |>
+  fp_set_zebra_style("#EFEFEF")

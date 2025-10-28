@@ -1,0 +1,37 @@
+\documentclass{article}
+\usepackage[margin=0.1in]{geometry}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+
+\begin{document}
+
+\begin{figure}[p]
+  \centering
+  \captionsetup{labelformat=empty}
+
+  % Set width and height to fit 2 across and 3 down
+  \newcommand{\figwidth}{0.48\textwidth}
+
+  % First row (2 columns)
+  \includegraphics[width=\figwidth]{Hist_Age_MGonset.pdf}
+  \hspace{0.01\textwidth}
+  \includegraphics[width=\figwidth]{Hist_Age_MYonset.pdf}
+
+  \vspace{0.01\textheight}
+
+  % Second row (2 columns)
+  \includegraphics[width=\figwidth]{Hist_Age_MGonset_Female.pdf}
+  \hspace{0.01\textwidth}
+  \includegraphics[width=\figwidth]{Hist_Age_MYonset_Female.pdf}
+
+  \vspace{0.01\textheight}
+
+  % Third row (2 columns)
+  \includegraphics[width=\figwidth]{Hist_Age_MGonset_Male.pdf}
+  \hspace{0.01\textwidth}
+  \includegraphics[width=\figwidth]{Hist_Age_MYonset_Male.pdf}
+
+\end{figure}
+
+\end{document}
